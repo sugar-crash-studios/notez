@@ -4,6 +4,8 @@ import cookie from '@fastify/cookie';
 import jwt from '@fastify/jwt';
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
+import { authRoutes } from './routes/auth.routes.js';
+import { usersRoutes } from './routes/users.routes.js';
 
 const prisma = new PrismaClient();
 const fastify = Fastify({
@@ -49,6 +51,10 @@ fastify.get('/', async () => {
     status: 'running'
   };
 });
+
+// Register API routes
+await fastify.register(authRoutes, { prefix: '/api' });
+await fastify.register(usersRoutes, { prefix: '/api' });
 
 // Start server
 const start = async () => {
