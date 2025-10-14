@@ -1,0 +1,61 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: notez-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-notez}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Please set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-notez}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - notez-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-notez}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  backend:
+    image: ghcr.io/yourusername/notez-backend:latest
+    container_name: notez-backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://${POSTGRES_USER:-notez}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-notez}?schema=public
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?Please set JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Please set JWT_REFRESH_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Please set ENCRYPTION_KEY}
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://notez.curgghoth.com}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - notez-network
+    command: sh -c "npx prisma migrate deploy && node dist/index.js"
+
+  # Frontend
+  frontend:
+    image: ghcr.io/yourusername/notez-frontend:latest
+    container_name: notez-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - notez-network
+
+networks:
+  notez-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

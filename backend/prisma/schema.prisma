@@ -1,0 +1,118 @@
+// Notez Database Schema
+// PostgreSQL with pgvector for future AI features
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User accounts
+model User {
+  id                 String    @id @default(uuid())
+  username           String    @unique @db.VarChar(50)
+  email              String    @unique @db.VarChar(255)
+  passwordHash       String    @map("password_hash") @db.VarChar(255)
+  role               String    @default("user") @db.VarChar(20) // 'admin' or 'user'
+  isActive           Boolean   @default(true) @map("is_active")
+  mustChangePassword Boolean   @default(false) @map("must_change_password")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  sessions Session[]
+  folders  Folder[]
+  notes    Note[]
+  tags     Tag[]
+
+  @@map("users")
+}
+
+// Session management for refresh tokens
+model Session {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  refreshToken String   @unique @map("refresh_token") @db.VarChar(500)
+  expiresAt    DateTime @map("expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+// Folders for organizing notes
+model Folder {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  name      String   @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notes Note[]
+
+  @@unique([userId, name])
+  @@map("folders")
+}
+
+// Notes
+model Note {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  folderId  String?  @map("folder_id")
+  title     String   @db.VarChar(500)
+  content   String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folder Folder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  tags   NoteTag[]
+
+  @@map("notes")
+}
+
+// Tags
+model Tag {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  name      String   @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notes NoteTag[]
+
+  @@unique([userId, name])
+  @@map("tags")
+}
+
+// Note-Tag junction table
+model NoteTag {
+  noteId String @map("note_id")
+  tagId  String @map("tag_id")
+
+  // Relations
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, tagId])
+  @@map("note_tags")
+}
+
+// System settings (key-value store)
+model SystemSetting {
+  key       String   @id @db.VarChar(100)
+  value     String?  @db.Text
+  encrypted Boolean  @default(false)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
