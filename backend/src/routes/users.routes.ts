@@ -53,7 +53,7 @@ export async function usersRoutes(fastify: FastifyInstance) {
   );
 
   // Get user statistics
-  fastify.get('/users/stats', async (request, reply) => {
+  fastify.get('/users/stats', async (_request, reply) => {
     try {
       const stats = await userService.getUserStats();
       return stats;

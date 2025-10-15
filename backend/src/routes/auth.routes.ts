@@ -10,7 +10,7 @@ import {
 
 export async function authRoutes(fastify: FastifyInstance) {
   // Check if setup is needed
-  fastify.get('/auth/setup-needed', async (request, reply) => {
+  fastify.get('/auth/setup-needed', async (_request, reply) => {
     try {
       const isFirst = await authService.isFirstUser();
       return { setupNeeded: isFirst };

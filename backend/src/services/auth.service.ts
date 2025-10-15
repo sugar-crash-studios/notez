@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 import { prisma } from '../lib/db.js';
-import { generateTokenPair, verifyRefreshToken, type TokenPayload } from '../utils/jwt.utils.js';
+import { generateTokenPair, verifyRefreshToken } from '../utils/jwt.utils.js';
 import type { SetupInput, LoginInput, ChangePasswordInput } from '../utils/validation.schemas.js';
 
 const SALT_ROUNDS = 10;
@@ -155,9 +155,8 @@ export async function login(data: LoginInput) {
  */
 export async function refreshAccessToken(refreshToken: string) {
   // Verify refresh token
-  let payload: TokenPayload;
   try {
-    payload = verifyRefreshToken(refreshToken);
+    verifyRefreshToken(refreshToken);
   } catch (error) {
     throw new Error('Invalid or expired refresh token');
   }
