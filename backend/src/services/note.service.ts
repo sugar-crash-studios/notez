@@ -121,195 +121,170 @@ export async function listNotes(
  * Create a new note
  */
 export async function createNote(userId: string, data: CreateNoteInput) {
-  // If folderId is provided, verify it belongs to the user
-  if (data.folderId) {
-    const folder = await prisma.folder.findFirst({
-      where: {
-        id: data.folderId,
-        userId,
-      },
-    });
-
-    if (!folder) {
-      throw new Error('Folder not found');
-    }
-  }
-
-  // Handle tags if provided
-  let tagConnections: any[] = [];
-  if (data.tags && data.tags.length > 0) {
-    // Find or create tags
-    const tagPromises = data.tags.map(async (tagName) => {
-      // Try to find existing tag
-      let tag = await prisma.tag.findFirst({
+  return prisma.$transaction(async (tx) => {
+    // If folderId is provided, verify it belongs to the user
+    if (data.folderId) {
+      const folder = await tx.folder.findFirst({
         where: {
-          name: tagName,
+          id: data.folderId,
           userId,
         },
       });
 
-      // Create tag if it doesn't exist
-      if (!tag) {
-        tag = await prisma.tag.create({
-          data: {
-            name: tagName,
-            userId,
-          },
-        });
+      if (!folder) {
+        throw new Error('Folder not found');
       }
+    }
 
-      return tag;
-    });
+    // Handle tags if provided - use upsert to prevent race conditions
+    let tagConnections: any[] = [];
+    if (data.tags && data.tags.length > 0) {
+      const tagUpserts = data.tags.map((tagName) =>
+        tx.tag.upsert({
+          where: { userId_name: { userId, name: tagName } },
+          update: {},
+          create: { name: tagName, userId },
+        })
+      );
 
-    const tags = await Promise.all(tagPromises);
-    tagConnections = tags.map((tag) => ({
-      tag: { connect: { id: tag.id } },
-    }));
-  }
+      const tags = await Promise.all(tagUpserts);
+      tagConnections = tags.map((tag) => ({
+        tag: { connect: { id: tag.id } },
+      }));
+    }
 
-  // Create note with tags
-  const note = await prisma.note.create({
-    data: {
-      title: data.title,
-      content: data.content || null,
-      userId,
-      folderId: data.folderId || null,
-      tags: {
-        create: tagConnections,
-      },
-    },
-    include: {
-      folder: {
-        select: {
-          id: true,
-          name: true,
+    // Create note with tags
+    const note = await tx.note.create({
+      data: {
+        title: data.title,
+        content: data.content || null,
+        userId,
+        folderId: data.folderId || null,
+        tags: {
+          create: tagConnections,
         },
       },
-      tags: {
-        include: {
-          tag: {
-            select: {
-              id: true,
-              name: true,
+      include: {
+        folder: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        tags: {
+          include: {
+            tag: {
+              select: {
+                id: true,
+                name: true,
+              },
             },
           },
         },
       },
-    },
-  });
+    });
 
-  // Transform tags to simpler format
-  return {
-    ...note,
-    tags: note.tags.map((nt) => nt.tag),
-  };
+    // Transform tags to simpler format
+    return {
+      ...note,
+      tags: note.tags.map((nt) => nt.tag),
+    };
+  });
 }
 
 /**
  * Update a note
  */
 export async function updateNote(noteId: string, userId: string, data: UpdateNoteInput) {
-  // Verify note exists and belongs to user
-  const existingNote = await prisma.note.findFirst({
-    where: {
-      id: noteId,
-      userId,
-    },
-  });
-
-  if (!existingNote) {
-    throw new Error('Note not found');
-  }
-
-  // If folderId is being updated, verify it belongs to the user
-  if (data.folderId !== undefined && data.folderId !== null) {
-    const folder = await prisma.folder.findFirst({
+  return prisma.$transaction(async (tx) => {
+    // Verify note exists and belongs to user
+    const existingNote = await tx.note.findFirst({
       where: {
-        id: data.folderId,
+        id: noteId,
         userId,
       },
     });
 
-    if (!folder) {
-      throw new Error('Folder not found');
+    if (!existingNote) {
+      throw new Error('Note not found');
     }
-  }
 
-  // Handle tags if provided
-  if (data.tags !== undefined) {
-    // Remove existing tag associations
-    await prisma.noteTag.deleteMany({
-      where: { noteId },
-    });
-
-    // Add new tags
-    if (data.tags.length > 0) {
-      const tagPromises = data.tags.map(async (tagName) => {
-        // Find or create tag
-        let tag = await prisma.tag.findFirst({
-          where: {
-            name: tagName,
-            userId,
-          },
-        });
-
-        if (!tag) {
-          tag = await prisma.tag.create({
-            data: {
-              name: tagName,
-              userId,
-            },
-          });
-        }
-
-        // Create note-tag association
-        await prisma.noteTag.create({
-          data: {
-            noteId,
-            tagId: tag.id,
-          },
-        });
-
-        return tag;
+    // If folderId is being updated, verify it belongs to the user
+    if (data.folderId !== undefined && data.folderId !== null) {
+      const folder = await tx.folder.findFirst({
+        where: {
+          id: data.folderId,
+          userId,
+        },
       });
 
-      await Promise.all(tagPromises);
+      if (!folder) {
+        throw new Error('Folder not found');
+      }
     }
-  }
 
-  // Update note
-  const note = await prisma.note.update({
-    where: { id: noteId },
-    data: {
-      title: data.title,
-      content: data.content,
-      folderId: data.folderId,
-    },
-    include: {
-      folder: {
-        select: {
-          id: true,
-          name: true,
-        },
+    // Handle tags if provided
+    if (data.tags !== undefined) {
+      // Remove existing tag associations
+      await tx.noteTag.deleteMany({
+        where: { noteId },
+      });
+
+      // Add new tags using upsert to prevent race conditions
+      if (data.tags.length > 0) {
+        const tagUpserts = data.tags.map((tagName) =>
+          tx.tag.upsert({
+            where: { userId_name: { userId, name: tagName } },
+            update: {},
+            create: { name: tagName, userId },
+          })
+        );
+        const tags = await Promise.all(tagUpserts);
+
+        // Create note-tag associations
+        await tx.noteTag.createMany({
+          data: tags.map((tag) => ({
+            noteId,
+            tagId: tag.id,
+          })),
+        });
+      }
+    }
+
+    // Update note
+    const note = await tx.note.update({
+      where: { id: noteId },
+      data: {
+        title: data.title,
+        content: data.content,
+        folderId: data.folderId,
       },
-      tags: {
-        include: {
-          tag: {
-            select: {
-              id: true,
-              name: true,
+      include: {
+        folder: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        tags: {
+          include: {
+            tag: {
+              select: {
+                id: true,
+                name: true,
+              },
             },
           },
         },
       },
-    },
-  });
+    });
 
-  // Transform tags to simpler format
-  return {
-    ...note,
-    tags: note.tags.map((nt) => nt.tag),
-  };
+    // Transform tags to simpler format
+    return {
+      ...note,
+      tags: note.tags.map((nt) => nt.tag),
+    };
+  });
 }
 
 /**

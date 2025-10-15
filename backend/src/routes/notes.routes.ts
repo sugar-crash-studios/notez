@@ -7,6 +7,8 @@ import {
   createNoteSchema,
   updateNoteSchema,
   listNotesQuerySchema,
+  type CreateNoteInput,
+  type UpdateNoteInput,
 } from '../utils/validation.schemas.js';
 
 // Param schemas
@@ -105,7 +107,7 @@ export async function notesRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       try {
         const userId = request.user!.userId;
-        const note = await noteService.createNote(userId, request.body as any);
+        const note = await noteService.createNote(userId, request.body as CreateNoteInput);
 
         return reply.status(201).send({
           message: 'Note created successfully',
@@ -141,7 +143,7 @@ export async function notesRoutes(fastify: FastifyInstance) {
       try {
         const userId = request.user!.userId;
         const params = request.params as z.infer<typeof noteIdParamSchema>;
-        const note = await noteService.updateNote(params.id, userId, request.body as any);
+        const note = await noteService.updateNote(params.id, userId, request.body as UpdateNoteInput);
 
         return {
           message: 'Note updated successfully',
