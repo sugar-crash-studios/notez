@@ -1,12 +1,5 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
-import { verifyAccessToken, type TokenPayload } from '../utils/jwt.utils.js';
-
-// Extend FastifyRequest to include user
-declare module 'fastify' {
-  interface FastifyRequest {
-    user?: TokenPayload;
-  }
-}
+import { verifyAccessToken } from '../utils/jwt.utils.js';
 
 /**
  * Middleware to verify JWT access token
@@ -77,7 +70,7 @@ export async function requireAdmin(
  */
 export async function optionalAuth(
   request: FastifyRequest,
-  reply: FastifyReply
+  _reply: FastifyReply
 ) {
   try {
     const authHeader = request.headers.authorization;

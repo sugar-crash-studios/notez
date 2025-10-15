@@ -5,6 +5,7 @@ import jwt from '@fastify/jwt';
 import 'dotenv/config';
 import { authRoutes } from './routes/auth.routes.js';
 import { usersRoutes } from './routes/users.routes.js';
+import { notesRoutes } from './routes/notes.routes.js';
 import { prisma, disconnectPrisma } from './lib/db.js';
 const fastify = Fastify({
   logger: {
@@ -53,6 +54,7 @@ fastify.get('/', async () => {
 // Register API routes
 await fastify.register(authRoutes, { prefix: '/api' });
 await fastify.register(usersRoutes, { prefix: '/api' });
+await fastify.register(notesRoutes, { prefix: '/api' });
 
 // Start server
 const start = async () => {

@@ -51,6 +51,28 @@ export const resetPasswordSchema = z.object({
   newPassword: passwordSchema,
 });
 
+// Note schemas
+export const createNoteSchema = z.object({
+  title: z.string().min(1, 'Title is required').max(500, 'Title must not exceed 500 characters'),
+  content: z.string().optional(),
+  folderId: z.string().uuid('Invalid folder ID').optional(),
+  tags: z.array(z.string().min(1).max(100)).optional(),
+});
+
+export const updateNoteSchema = z.object({
+  title: z.string().min(1, 'Title is required').max(500, 'Title must not exceed 500 characters').optional(),
+  content: z.string().optional(),
+  folderId: z.string().uuid('Invalid folder ID').nullable().optional(),
+  tags: z.array(z.string().min(1).max(100)).optional(),
+});
+
+export const listNotesQuerySchema = z.object({
+  folderId: z.string().uuid('Invalid folder ID').optional(),
+  search: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
 // Type exports
 export type SetupInput = z.infer<typeof setupSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
@@ -58,3 +80,6 @@ export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+export type CreateNoteInput = z.infer<typeof createNoteSchema>;
+export type UpdateNoteInput = z.infer<typeof updateNoteSchema>;
+export type ListNotesQuery = z.infer<typeof listNotesQuerySchema>;
