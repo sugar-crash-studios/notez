@@ -115,3 +115,22 @@ export const foldersApi = {
 
   stats: () => api.get('/api/folders/stats'),
 };
+
+export const usersApi = {
+  list: (includeInactive?: boolean) => api.get('/api/users', { params: { includeInactive } }),
+
+  get: (id: string) => api.get(`/api/users/${id}`),
+
+  create: (data: { username: string; email: string; password: string; role?: string }) =>
+    api.post('/api/users', data),
+
+  update: (id: string, data: { username?: string; email?: string; role?: string; isActive?: boolean }) =>
+    api.patch(`/api/users/${id}`, data),
+
+  delete: (id: string) => api.delete(`/api/users/${id}`),
+
+  resetPassword: (id: string, newPassword: string) =>
+    api.post(`/api/users/${id}/reset-password`, { newPassword }),
+
+  stats: () => api.get('/api/users/stats'),
+};
