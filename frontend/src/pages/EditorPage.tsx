@@ -18,6 +18,14 @@ export function EditorPage() {
           <h1 className="text-xl font-bold text-gray-900">Notez</h1>
         </div>
         <div className="flex items-center space-x-4">
+          {user?.role === 'admin' && (
+            <a
+              href="/admin"
+              className="px-3 py-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 border border-blue-600 rounded-md hover:bg-blue-50"
+            >
+              Admin Panel
+            </a>
+          )}
           <span className="text-sm text-gray-600">
             {user?.username}
           </span>

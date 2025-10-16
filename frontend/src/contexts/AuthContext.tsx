@@ -6,14 +6,18 @@ interface User {
   userId: string;
   username: string;
   role: string;
+  mustChangePassword?: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  setupNeeded: boolean;
   login: (usernameOrEmail: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  updateUser: (userData: Partial<User>) => void;
+  refreshAuth: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,10 +25,11 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [setupNeeded, setSetupNeeded] = useState(false);
 
   // Check if user is authenticated on mount
   useEffect(() => {
-    checkAuth();
+    checkSetupAndAuth();
 
     // Listen for auth failures from API interceptor
     const handleAuthFailure = () => {
@@ -34,6 +39,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.addEventListener('auth-failure', handleAuthFailure);
     return () => window.removeEventListener('auth-failure', handleAuthFailure);
   }, []);
+
+  const checkSetupAndAuth = async () => {
+    try {
+      // First check if setup is needed
+      const setupResponse = await authApi.setupNeeded();
+      setSetupNeeded(setupResponse.data.setupNeeded);
+
+      if (setupResponse.data.setupNeeded) {
+        // Setup needed, don't check auth
+        setIsLoading(false);
+        return;
+      }
+
+      // Setup not needed, check auth
+      await checkAuth();
+    } catch (error) {
+      console.error('Failed to check setup status:', error);
+      setIsLoading(false);
+    }
+  };
 
   const checkAuth = async () => {
     const token = localStorage.getItem('accessToken');
@@ -77,12 +102,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateUser = (userData: Partial<User>) => {
+    setUser((current) => (current ? { ...current, ...userData } : null));
+  };
+
+  const refreshAuth = async () => {
+    await checkSetupAndAuth();
+  };
+
   const value = {
     user,
     isLoading,
     isAuthenticated: !!user,
+    setupNeeded,
     login,
     logout,
+    updateUser,
+    refreshAuth,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
