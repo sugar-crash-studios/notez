@@ -150,7 +150,7 @@ export function FolderSidebar({
 
       {/* Folder List */}
       <div className="flex-1 overflow-y-auto">
-        {/* All Notes */}
+        {/* All Notes - Clear all filters */}
         <button
           onClick={() => {
             onSelectFolder(null);
@@ -175,10 +175,7 @@ export function FolderSidebar({
           folders.map((folder) => (
             <button
               key={folder.id}
-              onClick={() => {
-                onSelectFolder(folder.id);
-                onSelectTag(null);
-              }}
+              onClick={() => onSelectFolder(folder.id)}
               className={`w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 ${
                 selectedFolderId === folder.id ? 'bg-blue-50 border-l-4 border-blue-600' : ''
               }`}
@@ -219,10 +216,7 @@ export function FolderSidebar({
                 tags.map((tag) => (
                   <button
                     key={tag.id}
-                    onClick={() => {
-                      onSelectTag(tag.id);
-                      onSelectFolder(null);
-                    }}
+                    onClick={() => onSelectTag(tag.id)}
                     className={`w-full px-4 py-2 pl-12 flex items-center justify-between hover:bg-gray-50 text-left ${
                       selectedTagId === tag.id ? 'bg-blue-50 border-l-4 border-blue-600' : ''
                     }`}

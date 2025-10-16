@@ -47,13 +47,13 @@ export function EditorPage() {
           selectedTagId={selectedTagId}
           onSelectFolder={(folderId) => {
             setSelectedFolderId(folderId);
-            setSelectedTagId(null);
-            setSelectedNoteId(null); // Reset note selection when folder changes
+            // Don't clear tag - allow combined filtering
+            setSelectedNoteId(null); // Reset note selection when filter changes
           }}
           onSelectTag={(tagId) => {
             setSelectedTagId(tagId);
-            setSelectedFolderId(null);
-            setSelectedNoteId(null); // Reset note selection when tag changes
+            // Don't clear folder - allow combined filtering
+            setSelectedNoteId(null); // Reset note selection when filter changes
           }}
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
