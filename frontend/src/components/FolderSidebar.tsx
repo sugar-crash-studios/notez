@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { foldersApi } from '../lib/api';
-import { ChevronLeft, ChevronRight, Folder, FolderPlus } from 'lucide-react';
+import { foldersApi, tagsApi } from '../lib/api';
+import { ChevronLeft, ChevronRight, Folder, FolderPlus, Tag, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface FolderData {
   id: string;
@@ -10,26 +10,39 @@ interface FolderData {
   updatedAt: string;
 }
 
+interface TagData {
+  id: string;
+  name: string;
+  noteCount: number;
+}
+
 interface FolderSidebarProps {
   selectedFolderId: string | null;
+  selectedTagId: string | null;
   onSelectFolder: (folderId: string | null) => void;
+  onSelectTag: (tagId: string | null) => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
 }
 
 export function FolderSidebar({
   selectedFolderId,
+  selectedTagId,
   onSelectFolder,
+  onSelectTag,
   collapsed,
   onToggleCollapse,
 }: FolderSidebarProps) {
   const [folders, setFolders] = useState<FolderData[]>([]);
+  const [tags, setTags] = useState<TagData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showNewFolderInput, setShowNewFolderInput] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
+  const [tagsExpanded, setTagsExpanded] = useState(true);
 
   useEffect(() => {
     loadFolders();
+    loadTags();
   }, []);
 
   const loadFolders = async () => {
@@ -40,6 +53,15 @@ export function FolderSidebar({
       console.error('Failed to load folders:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadTags = async () => {
+    try {
+      const response = await tagsApi.list();
+      setTags(response.data.tags);
+    } catch (error) {
+      console.error('Failed to load tags:', error);
     }
   };
 
@@ -130,9 +152,12 @@ export function FolderSidebar({
       <div className="flex-1 overflow-y-auto">
         {/* All Notes */}
         <button
-          onClick={() => onSelectFolder(null)}
+          onClick={() => {
+            onSelectFolder(null);
+            onSelectTag(null);
+          }}
           className={`w-full px-4 py-2.5 flex items-center space-x-3 hover:bg-gray-50 ${
-            selectedFolderId === null ? 'bg-blue-50 border-l-4 border-blue-600' : ''
+            selectedFolderId === null && selectedTagId === null ? 'bg-blue-50 border-l-4 border-blue-600' : ''
           }`}
         >
           <Folder className="w-5 h-5 text-gray-400" />
@@ -150,7 +175,10 @@ export function FolderSidebar({
           folders.map((folder) => (
             <button
               key={folder.id}
-              onClick={() => onSelectFolder(folder.id)}
+              onClick={() => {
+                onSelectFolder(folder.id);
+                onSelectTag(null);
+              }}
               className={`w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 ${
                 selectedFolderId === folder.id ? 'bg-blue-50 border-l-4 border-blue-600' : ''
               }`}
@@ -163,6 +191,50 @@ export function FolderSidebar({
             </button>
           ))
         )}
+
+        {/* Tags Section */}
+        <div className="mt-4 border-t border-gray-200">
+          <button
+            onClick={() => setTagsExpanded(!tagsExpanded)}
+            className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50"
+          >
+            <div className="flex items-center space-x-3">
+              <Tag className="w-5 h-5 text-gray-400" />
+              <span className="text-sm font-medium text-gray-700">Tags</span>
+            </div>
+            {tagsExpanded ? (
+              <ChevronUp className="w-4 h-4 text-gray-400" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-gray-400" />
+            )}
+          </button>
+
+          {tagsExpanded && (
+            <div>
+              {tags.length === 0 ? (
+                <div className="px-4 py-4 text-center text-sm text-gray-500">
+                  No tags yet. Add tags to your notes!
+                </div>
+              ) : (
+                tags.map((tag) => (
+                  <button
+                    key={tag.id}
+                    onClick={() => {
+                      onSelectTag(tag.id);
+                      onSelectFolder(null);
+                    }}
+                    className={`w-full px-4 py-2 pl-12 flex items-center justify-between hover:bg-gray-50 text-left ${
+                      selectedTagId === tag.id ? 'bg-blue-50 border-l-4 border-blue-600' : ''
+                    }`}
+                  >
+                    <span className="text-sm text-gray-700">{tag.name}</span>
+                    <span className="text-xs text-gray-500">{tag.noteCount}</span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

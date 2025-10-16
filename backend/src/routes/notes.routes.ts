@@ -36,6 +36,7 @@ export async function notesRoutes(fastify: FastifyInstance) {
 
         const result = await noteService.listNotes(userId, {
           folderId,
+          tagId: query.tagId,
           search: query.search,
           limit: query.limit,
           offset: query.offset,

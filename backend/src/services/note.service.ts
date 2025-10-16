@@ -44,18 +44,19 @@ export async function getNoteById(noteId: string, userId: string) {
 
 /**
  * List all notes for a user
- * Supports filtering by folder and search
+ * Supports filtering by folder, tag, and search
  */
 export async function listNotes(
   userId: string,
   options?: {
     folderId?: string | null;
+    tagId?: string;
     search?: string;
     limit?: number;
     offset?: number;
   }
 ) {
-  const { folderId, search, limit = 50, offset = 0 } = options || {};
+  const { folderId, tagId, search, limit = 50, offset = 0 } = options || {};
 
   // Build where clause
   const where: any = { userId };
@@ -63,6 +64,15 @@ export async function listNotes(
   // Filter by folder (null means unfiled notes)
   if (folderId !== undefined) {
     where.folderId = folderId;
+  }
+
+  // Filter by tag
+  if (tagId) {
+    where.tags = {
+      some: {
+        tagId,
+      },
+    };
   }
 
   // Search in title and content

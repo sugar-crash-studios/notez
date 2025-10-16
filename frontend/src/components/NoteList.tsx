@@ -14,18 +14,19 @@ interface Note {
 
 interface NoteListProps {
   folderId: string | null;
+  tagId: string | null;
   selectedNoteId: string | null;
   onSelectNote: (noteId: string) => void;
 }
 
-export function NoteList({ folderId, selectedNoteId, onSelectNote }: NoteListProps) {
+export function NoteList({ folderId, tagId, selectedNoteId, onSelectNote }: NoteListProps) {
   const [notes, setNotes] = useState<Note[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     loadNotes();
-  }, [folderId, searchQuery]);
+  }, [folderId, tagId, searchQuery]);
 
   const loadNotes = async () => {
     setIsLoading(true);
@@ -33,6 +34,9 @@ export function NoteList({ folderId, selectedNoteId, onSelectNote }: NoteListPro
       const params: any = { limit: 100 };
       if (folderId) {
         params.folderId = folderId;
+      }
+      if (tagId) {
+        params.tagId = tagId;
       }
       if (searchQuery) {
         params.search = searchQuery;

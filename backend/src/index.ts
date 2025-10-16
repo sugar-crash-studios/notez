@@ -7,6 +7,7 @@ import { authRoutes } from './routes/auth.routes.js';
 import { usersRoutes } from './routes/users.routes.js';
 import { notesRoutes } from './routes/notes.routes.js';
 import { foldersRoutes } from './routes/folders.routes.js';
+import { tagRoutes } from './routes/tags.routes.js';
 import { prisma, disconnectPrisma } from './lib/db.js';
 const fastify = Fastify({
   logger: {
@@ -57,6 +58,7 @@ await fastify.register(authRoutes, { prefix: '/api' });
 await fastify.register(usersRoutes, { prefix: '/api' });
 await fastify.register(notesRoutes, { prefix: '/api' });
 await fastify.register(foldersRoutes, { prefix: '/api' });
+await fastify.register(tagRoutes, { prefix: '/api/tags' });
 
 // Start server
 const start = async () => {

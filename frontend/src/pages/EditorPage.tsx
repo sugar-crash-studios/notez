@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 export function EditorPage() {
   const { user, logout } = useAuth();
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -43,9 +44,16 @@ export function EditorPage() {
         {/* Folder Sidebar */}
         <FolderSidebar
           selectedFolderId={selectedFolderId}
+          selectedTagId={selectedTagId}
           onSelectFolder={(folderId) => {
             setSelectedFolderId(folderId);
+            setSelectedTagId(null);
             setSelectedNoteId(null); // Reset note selection when folder changes
+          }}
+          onSelectTag={(tagId) => {
+            setSelectedTagId(tagId);
+            setSelectedFolderId(null);
+            setSelectedNoteId(null); // Reset note selection when tag changes
           }}
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -54,6 +62,7 @@ export function EditorPage() {
         {/* Note List */}
         <NoteList
           folderId={selectedFolderId}
+          tagId={selectedTagId}
           selectedNoteId={selectedNoteId}
           onSelectNote={setSelectedNoteId}
         />

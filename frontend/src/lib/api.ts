@@ -86,7 +86,7 @@ export const authApi = {
 };
 
 export const notesApi = {
-  list: (params?: { folderId?: string; search?: string; limit?: number; offset?: number }) =>
+  list: (params?: { folderId?: string; tagId?: string; search?: string; limit?: number; offset?: number }) =>
     api.get('/api/notes', { params }),
 
   get: (id: string) => api.get(`/api/notes/${id}`),
@@ -133,4 +133,19 @@ export const usersApi = {
     api.post(`/api/users/${id}/reset-password`, { newPassword }),
 
   stats: () => api.get('/api/users/stats'),
+};
+
+export const tagsApi = {
+  list: () => api.get('/api/tags'),
+
+  get: (id: string) => api.get(`/api/tags/${id}`),
+
+  search: (query?: string, limit?: number) =>
+    api.get('/api/tags/search', { params: { q: query, limit } }),
+
+  rename: (id: string, name: string) => api.patch(`/api/tags/${id}`, { name }),
+
+  delete: (id: string) => api.delete(`/api/tags/${id}`),
+
+  stats: () => api.get('/api/tags/stats'),
 };

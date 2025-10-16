@@ -68,6 +68,7 @@ export const updateNoteSchema = z.object({
 
 export const listNotesQuerySchema = z.object({
   folderId: z.string().uuid('Invalid folder ID').optional(),
+  tagId: z.string().uuid('Invalid tag ID').optional(),
   search: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0),

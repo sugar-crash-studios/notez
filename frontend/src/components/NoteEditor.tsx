@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import Editor from '@monaco-editor/react';
 import { notesApi } from '../lib/api';
 import { Save, Trash2 } from 'lucide-react';
+import { TagInput } from './TagInput';
 
 interface Note {
   id: string;
@@ -22,6 +23,7 @@ export function NoteEditor({ noteId, onNoteDeleted }: NoteEditorProps) {
   const [note, setNote] = useState<Note | null>(null);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [tags, setTags] = useState<Array<{ id: string; name: string }>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -35,6 +37,7 @@ export function NoteEditor({ noteId, onNoteDeleted }: NoteEditorProps) {
       setNote(null);
       setTitle('');
       setContent('');
+      setTags([]);
     }
   }, [noteId]);
 
@@ -57,7 +60,7 @@ export function NoteEditor({ noteId, onNoteDeleted }: NoteEditorProps) {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [title, content]);
+  }, [title, content, tags]);
 
   const loadNote = async (id: string) => {
     setIsLoading(true);
@@ -67,6 +70,7 @@ export function NoteEditor({ noteId, onNoteDeleted }: NoteEditorProps) {
       setNote(loadedNote);
       setTitle(loadedNote.title);
       setContent(loadedNote.content || '');
+      setTags(loadedNote.tags || []);
       setLastSaved(new Date(loadedNote.updatedAt));
     } catch (error) {
       console.error('Failed to load note:', error);
@@ -77,17 +81,23 @@ export function NoteEditor({ noteId, onNoteDeleted }: NoteEditorProps) {
 
   const saveNote = async () => {
     if (!note || isSaving) return; // Prevent concurrent saves
-    if (title === note.title && content === (note.content || '')) return;
+
+    const currentTagNames = tags.map((t) => t.name);
+    const noteTagNames = (note.tags || []).map((t) => t.name);
+    const tagsChanged = JSON.stringify(currentTagNames.sort()) !== JSON.stringify(noteTagNames.sort());
+
+    if (title === note.title && content === (note.content || '') && !tagsChanged) return;
 
     setIsSaving(true);
     try {
       await notesApi.update(note.id, {
         title,
         content,
+        tags: currentTagNames,
       });
       setLastSaved(new Date());
       // Update local note
-      setNote({ ...note, title, content });
+      setNote({ ...note, title, content, tags });
     } catch (error) {
       console.error('Failed to save note:', error);
     } finally {
@@ -138,42 +148,57 @@ export function NoteEditor({ noteId, onNoteDeleted }: NoteEditorProps) {
   return (
     <div className="flex-1 flex flex-col bg-white">
       {/* Editor Header */}
-      <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="flex-1 text-2xl font-bold text-gray-900 focus:outline-none"
-          placeholder="Untitled Note"
-        />
-        <div className="flex items-center space-x-3">
-          {/* Save Status */}
-          <div className="flex items-center space-x-2">
-            {isSaving ? (
-              <span className="text-sm text-gray-500">Saving...</span>
-            ) : lastSaved ? (
-              <span className="text-sm text-gray-500">
-                Saved {formatSaveTime(lastSaved)}
-              </span>
-            ) : null}
+      <div className="px-6 py-4 border-b border-gray-200 space-y-3">
+        <div className="flex items-center justify-between">
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="flex-1 text-2xl font-bold text-gray-900 focus:outline-none"
+            placeholder="Untitled Note"
+          />
+          <div className="flex items-center space-x-3 ml-4">
+            {/* Save Status */}
+            <div className="flex items-center space-x-2">
+              {isSaving ? (
+                <span className="text-sm text-gray-500">Saving...</span>
+              ) : lastSaved ? (
+                <span className="text-sm text-gray-500">
+                  Saved {formatSaveTime(lastSaved)}
+                </span>
+              ) : null}
+              <button
+                onClick={handleManualSave}
+                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md"
+                title="Save now (Ctrl+S)"
+              >
+                <Save className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Delete Button */}
             <button
-              onClick={handleManualSave}
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md"
-              title="Save now (Ctrl+S)"
+              onClick={handleDeleteNote}
+              className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md"
+              title="Delete note"
             >
-              <Save className="w-4 h-4" />
+              <Trash2 className="w-4 h-4" />
             </button>
           </div>
-
-          {/* Delete Button */}
-          <button
-            onClick={handleDeleteNote}
-            className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md"
-            title="Delete note"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
         </div>
+
+        {/* Tags */}
+        <TagInput
+          tags={tags}
+          onChange={(tagNames) => {
+            // Convert tag names to tag objects, preserving existing IDs
+            const newTags = tagNames.map((name) => {
+              const existing = tags.find((t) => t.name === name);
+              return existing || { id: '', name };
+            });
+            setTags(newTags);
+          }}
+        />
       </div>
 
       {/* Monaco Editor */}
