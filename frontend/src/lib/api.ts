@@ -135,6 +135,10 @@ export const usersApi = {
   stats: () => api.get('/api/users/stats'),
 };
 
+export const systemApi = {
+  getInfo: () => api.get('/api/system/info'),
+};
+
 export const tagsApi = {
   list: () => api.get('/api/tags'),
 

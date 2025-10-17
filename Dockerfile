@@ -21,6 +21,9 @@ RUN npm run build
 # Stage 2: Build Backend
 FROM node:20-alpine AS backend-builder
 
+# Install OpenSSL for Prisma
+RUN apk add --no-cache openssl
+
 WORKDIR /app/backend
 
 # Copy backend package files
@@ -44,8 +47,8 @@ RUN npm run build
 # Stage 3: Production Image
 FROM node:20-alpine
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+# Install runtime dependencies (dumb-init for signal handling, openssl for Prisma)
+RUN apk add --no-cache dumb-init openssl
 
 WORKDIR /app
 

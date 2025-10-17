@@ -2,7 +2,8 @@
 // PostgreSQL with pgvector for future AI features
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {

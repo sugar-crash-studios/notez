@@ -1,6 +1,7 @@
 import { prisma } from '../lib/db.js';
 import { hashPassword } from './auth.service.js';
 import type { CreateUserInput, UpdateUserInput } from '../utils/validation.schemas.js';
+import { APP_VERSION, NODE_VERSION } from '../config/app.config.js';
 
 /**
  * Get user by ID
@@ -245,5 +246,62 @@ export async function getUserStats() {
     activeUsers,
     inactiveUsers: totalUsers - activeUsers,
     adminUsers,
+  };
+}
+
+/**
+ * Get system information
+ */
+export async function getSystemInfo() {
+  // Check database connection
+  let databaseStatus = 'connected';
+  let databaseInfo = 'PostgreSQL';
+
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+
+    // Try to get database version
+    try {
+      const result = await prisma.$queryRaw<Array<{ version: string }>>`SELECT version()`;
+      if (result && result.length > 0) {
+        // Extract PostgreSQL version from version string
+        const versionMatch = result[0].version.match(/PostgreSQL ([\d.]+)/);
+        if (versionMatch) {
+          databaseInfo = `PostgreSQL ${versionMatch[1]}`;
+        }
+      }
+    } catch {
+      // Ignore version query errors
+    }
+  } catch {
+    databaseStatus = 'disconnected';
+  }
+
+  // Get content statistics
+  const [totalNotes, totalFolders, totalTags] = await Promise.all([
+    prisma.note.count(),
+    prisma.folder.count(),
+    prisma.tag.count(),
+  ]);
+
+  // Calculate uptime
+  const uptimeSeconds = process.uptime();
+  const uptimeHours = Math.floor(uptimeSeconds / 3600);
+  const uptimeMinutes = Math.floor((uptimeSeconds % 3600) / 60);
+  const uptime = `${uptimeHours}h ${uptimeMinutes}m`;
+
+  return {
+    version: APP_VERSION,
+    nodeVersion: NODE_VERSION,
+    database: {
+      status: databaseStatus,
+      info: databaseInfo,
+    },
+    uptime,
+    statistics: {
+      totalNotes,
+      totalFolders,
+      totalTags,
+    },
   };
 }

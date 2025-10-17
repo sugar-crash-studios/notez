@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { usersApi } from '../lib/api';
-import { Users, UserPlus, Key, UserX, UserCheck, ArrowLeft } from 'lucide-react';
+import { usersApi, systemApi } from '../lib/api';
+import { Users, UserPlus, Key, UserX, UserCheck, ArrowLeft, Server, Database, HardDrive } from 'lucide-react';
 
 interface User {
   id: string;
@@ -13,10 +13,26 @@ interface User {
   createdAt: string;
 }
 
+interface SystemInfo {
+  version: string;
+  nodeVersion: string;
+  database: {
+    status: string;
+    info: string;
+  };
+  uptime: string;
+  statistics: {
+    totalNotes: number;
+    totalFolders: number;
+    totalTags: number;
+  };
+}
+
 export function AdminPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
+  const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showResetModal, setShowResetModal] = useState<string | null>(null);
@@ -39,6 +55,7 @@ export function AdminPage() {
       return;
     }
     loadUsers();
+    loadSystemInfo();
   }, [user, navigate]);
 
   const loadUsers = async () => {
@@ -50,6 +67,23 @@ export function AdminPage() {
       console.error('Failed to load users:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadSystemInfo = async () => {
+    try {
+      const response = await systemApi.getInfo();
+      setSystemInfo(response.data);
+    } catch (error) {
+      console.error('Failed to load system info:', error);
+      // Set systemInfo to a state that indicates an error
+      setSystemInfo({
+        version: 'Error',
+        nodeVersion: 'Error',
+        database: { status: 'error', info: 'Could not fetch info' },
+        uptime: 'Error',
+        statistics: { totalNotes: 0, totalFolders: 0, totalTags: 0 },
+      });
     }
   };
 
@@ -140,7 +174,72 @@ export function AdminPage() {
       </nav>
 
       {/* Main Content */}
-      <div className="max-w-6xl mx-auto py-8 px-4">
+      <div className="max-w-6xl mx-auto py-8 px-4 space-y-6">
+        {/* System Information */}
+        {systemInfo && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center space-x-3">
+              <Server className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">System Information</h2>
+            </div>
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Version Info */}
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-400">
+                  <HardDrive className="w-4 h-4" />
+                  <span className="text-sm font-medium">Application</span>
+                </div>
+                <div className="ml-6">
+                  <p className="text-sm text-gray-900 dark:text-white">Version: <span className="font-mono">{systemInfo.version}</span></p>
+                  <p className="text-sm text-gray-900 dark:text-white">Node.js: <span className="font-mono">{systemInfo.nodeVersion}</span></p>
+                  <p className="text-sm text-gray-900 dark:text-white">Uptime: <span className="font-mono">{systemInfo.uptime}</span></p>
+                </div>
+              </div>
+
+              {/* Database Info */}
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-400">
+                  <Database className="w-4 h-4" />
+                  <span className="text-sm font-medium">Database</span>
+                </div>
+                <div className="ml-6">
+                  <p className="text-sm text-gray-900 dark:text-white">
+                    Status:{' '}
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                        systemInfo.database.status === 'connected'
+                          ? 'bg-green-100 text-green-800'
+                          : systemInfo.database.status === 'error'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}
+                    >
+                      {systemInfo.database.status}
+                    </span>
+                  </p>
+                  <p className="text-sm text-gray-900 dark:text-white">
+                    Type: <span className="font-mono">{systemInfo.database.info}</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Content Statistics */}
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-400">
+                  <HardDrive className="w-4 h-4" />
+                  <span className="text-sm font-medium">Content</span>
+                </div>
+                <div className="ml-6">
+                  <p className="text-sm text-gray-900 dark:text-white">Notes: <span className="font-mono">{systemInfo.statistics.totalNotes}</span></p>
+                  <p className="text-sm text-gray-900 dark:text-white">Folders: <span className="font-mono">{systemInfo.statistics.totalFolders}</span></p>
+                  <p className="text-sm text-gray-900 dark:text-white">Tags: <span className="font-mono">{systemInfo.statistics.totalTags}</span></p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* User Management */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
           {/* User Management Header */}
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">

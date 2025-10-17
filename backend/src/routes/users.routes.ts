@@ -66,6 +66,20 @@ export async function usersRoutes(fastify: FastifyInstance) {
     }
   });
 
+  // Get system info
+  fastify.get('/system/info', async (_request, reply) => {
+    try {
+      const systemInfo = await userService.getSystemInfo();
+      return systemInfo;
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.status(500).send({
+        error: 'Internal Server Error',
+        message: 'Failed to get system information',
+      });
+    }
+  });
+
   // Get single user by ID
   fastify.get(
     '/users/:id',

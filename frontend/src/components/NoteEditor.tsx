@@ -245,7 +245,7 @@ export function NoteEditor({ noteId, onNoteDeleted }: NoteEditorProps) {
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="flex-1 text-2xl font-bold text-gray-900 dark:text-white focus:outline-none"
+            className="flex-1 text-2xl font-bold text-gray-900 dark:text-white bg-transparent border-b-2 border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none px-2 py-1 transition-colors"
             placeholder="Untitled Note"
           />
           <div className="flex items-center space-x-3 ml-4">
