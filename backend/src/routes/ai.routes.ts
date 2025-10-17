@@ -141,6 +141,40 @@ export async function aiRoutes(fastify: FastifyInstance) {
     }
   );
 
+  /**
+   * POST /api/ai/list-models
+   * List available models for a provider using provided API key
+   */
+  fastify.post<{ Body: AIConfigInput }>(
+    '/list-models',
+    {
+      preHandler: [validateBody(aiConfigSchema)],
+    },
+    async (request, reply) => {
+      try {
+        const config = request.body;
+        const models = await aiService.listModels(config);
+
+        reply.send({ success: true, models });
+      } catch (error: any) {
+        if (error instanceof AIProviderConnectionError) {
+          return reply.status(400).send({ success: false, message: 'Invalid API key or connection failed', models: [] });
+        }
+
+        if (error instanceof AIProviderRateLimitError) {
+          return reply.status(429).send({ success: false, message: 'Rate limit exceeded', models: [] });
+        }
+
+        if (error instanceof AIServiceError) {
+          return reply.status(400).send({ success: false, message: error.message, models: [] });
+        }
+
+        fastify.log.error(error);
+        reply.status(500).send({ success: false, message: 'Failed to list models', models: [] });
+      }
+    }
+  );
+
   // ==================== AI Feature Endpoints ====================
 
   /**

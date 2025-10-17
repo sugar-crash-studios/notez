@@ -160,6 +160,9 @@ export const aiApi = {
   testConnection: (data: { provider: 'anthropic' | 'openai' | 'gemini'; apiKey: string; model?: string }) =>
     api.post('/api/ai/test-connection', data),
 
+  listModels: (data: { provider: 'anthropic' | 'openai' | 'gemini'; apiKey: string; model?: string }) =>
+    api.post('/api/ai/list-models', data),
+
   // AI Features
   summarize: (data: { content: string; maxLength?: number }) =>
     api.post('/api/ai/summarize', data),

@@ -15,6 +15,7 @@ export function AISettings() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+  const [isFetchingModels, setIsFetchingModels] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -23,6 +24,7 @@ export function AISettings() {
   const [provider, setProvider] = useState<AIProvider>('anthropic');
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('');
+  const [availableModels, setAvailableModels] = useState<Array<{ id: string; name: string; description?: string }>>([]);
 
   useEffect(() => {
     loadSettings();
@@ -46,6 +48,35 @@ export function AISettings() {
     }
   };
 
+  const fetchAvailableModels = async () => {
+    if (!apiKey || apiKey.length < 10) return;
+
+    setIsFetchingModels(true);
+    try {
+      const response = await aiApi.listModels({
+        provider,
+        apiKey,
+        model: model || providerInfo[provider].defaultModel,
+      });
+
+      if (response.data.success && response.data.models && response.data.models.length > 0) {
+        setAvailableModels(response.data.models);
+        // If current model not in list, select first one
+        if (!response.data.models.find((m: any) => m.id === model)) {
+          setModel(response.data.models[0].id);
+        }
+      } else {
+        // Fall back to hardcoded models
+        setAvailableModels(providerInfo[provider].models);
+      }
+    } catch (err: any) {
+      console.warn('Failed to fetch models, using fallback:', err);
+      setAvailableModels(providerInfo[provider].models);
+    } finally {
+      setIsFetchingModels(false);
+    }
+  };
+
   const handleTestConnection = async () => {
     setIsTesting(true);
     setTestResult(null);
@@ -55,13 +86,18 @@ export function AISettings() {
       const response = await aiApi.testConnection({
         provider,
         apiKey,
-        model: model || undefined,
+        model: model || providerInfo[provider].defaultModel,
       });
 
       setTestResult({
         success: response.data.success,
         message: response.data.message || 'Connection successful',
       });
+
+      // On successful test, fetch available models
+      if (response.data.success) {
+        await fetchAvailableModels();
+      }
     } catch (err: any) {
       setTestResult({
         success: false,
@@ -83,7 +119,7 @@ export function AISettings() {
       await aiApi.saveSettings({
         provider,
         apiKey,
-        model: model || undefined,
+        model: model || providerInfo[provider].defaultModel,
       });
 
       setSuccess('AI settings saved successfully! Connection tested and verified.');
@@ -100,20 +136,39 @@ export function AISettings() {
     anthropic: {
       name: 'Anthropic Claude',
       defaultModel: 'claude-3-5-sonnet-20241022',
-      description: 'Claude 3.5 Sonnet - Powerful and versatile AI model',
+      description: 'Claude models - Powerful and versatile',
       keyFormat: 'sk-ant-api03-...',
+      models: [
+        { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet (Recommended)', description: 'Most capable model' },
+        { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku (Latest)', description: 'Fast and efficient' },
+        { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus', description: 'Previous generation flagship' },
+        { id: 'claude-3-sonnet-20240229', name: 'Claude 3 Sonnet', description: 'Balanced performance' },
+        { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku', description: 'Fast and cost-effective' },
+      ],
     },
     openai: {
       name: 'OpenAI GPT',
       defaultModel: 'gpt-4o-mini',
-      description: 'GPT-4o Mini - Fast and cost-effective',
+      description: 'GPT models - Versatile and powerful',
       keyFormat: 'sk-...',
+      models: [
+        { id: 'gpt-4o', name: 'GPT-4o (Recommended)', description: 'Most capable GPT-4 model' },
+        { id: 'gpt-4o-mini', name: 'GPT-4o Mini', description: 'Fast and cost-effective' },
+        { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', description: 'Fast GPT-4 variant' },
+        { id: 'gpt-4', name: 'GPT-4', description: 'Standard GPT-4' },
+        { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', description: 'Fast and economical' },
+      ],
     },
     gemini: {
       name: 'Google Gemini',
       defaultModel: 'gemini-1.5-flash',
-      description: 'Gemini 1.5 Flash - Quick and efficient',
+      description: 'Gemini models - Fast and efficient',
       keyFormat: 'AIza...',
+      models: [
+        { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro (Recommended)', description: 'Most capable model' },
+        { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', description: 'Fast and efficient' },
+        { id: 'gemini-1.0-pro', name: 'Gemini 1.0 Pro', description: 'Previous generation' },
+      ],
     },
   };
 
@@ -203,11 +258,12 @@ export function AISettings() {
             <select
               value={provider}
               onChange={(e) => {
-                setProvider(e.target.value as AIProvider);
-                setModel(''); // Reset model when provider changes
+                const newProvider = e.target.value as AIProvider;
+                setProvider(newProvider);
+                setModel(providerInfo[newProvider].defaultModel); // Set to default model of new provider
                 setTestResult(null);
               }}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
             >
               <option value="anthropic">Anthropic Claude</option>
               <option value="openai">OpenAI GPT</option>
@@ -235,23 +291,31 @@ export function AISettings() {
             </p>
           </div>
 
-          {/* Model Override (Optional) */}
+          {/* Model Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-              Model (Optional)
+              Model {isFetchingModels && <span className="text-xs text-gray-500">(Loading...)</span>}
             </label>
-            <input
-              type="text"
-              value={model}
+            <select
+              value={model || (availableModels.length > 0 ? availableModels[0].id : providerInfo[provider].defaultModel)}
               onChange={(e) => {
                 setModel(e.target.value);
                 setTestResult(null);
               }}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-              placeholder={providerInfo[provider].defaultModel}
-            />
+              disabled={isFetchingModels}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white disabled:opacity-50"
+            >
+              {(availableModels.length > 0 ? availableModels : providerInfo[provider].models).map((modelOption) => (
+                <option key={modelOption.id} value={modelOption.id}>
+                  {modelOption.name}
+                  {modelOption.description && ` - ${modelOption.description}`}
+                </option>
+              ))}
+            </select>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Leave empty to use the default model: {providerInfo[provider].defaultModel}
+              {availableModels.length > 0
+                ? 'Models loaded from API'
+                : 'Test connection to load available models'}
             </p>
           </div>
 

@@ -21,11 +21,17 @@ function getEncryptionKey(): string {
     }
     // Development fallback - NEVER use in production!
     console.warn('⚠️  Using default encryption key for development. Set ENCRYPTION_KEY in production!');
-    return 'dev-encryption-key-32-chars!!'; // Must be 32 characters for AES-256
+    return 'dev-encryption-key-32-chars!!!'; // Must be exactly 32 characters for AES-256
   }
 
-  if (key.length !== 32) {
-    throw new Error('ENCRYPTION_KEY must be exactly 32 characters');
+  if (key.length < 32) {
+    throw new Error(`ENCRYPTION_KEY must be at least 32 characters (current: ${key.length})`);
+  }
+
+  // If key is longer than 32 characters, truncate it to 32
+  if (key.length > 32) {
+    console.warn(`⚠️  ENCRYPTION_KEY is ${key.length} characters, truncating to 32 characters`);
+    return key.substring(0, 32);
   }
 
   return key;
