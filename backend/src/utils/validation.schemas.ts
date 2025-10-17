@@ -83,6 +83,47 @@ export const updateFolderSchema = z.object({
   name: z.string().min(1, 'Folder name is required').max(255, 'Folder name must not exceed 255 characters'),
 });
 
+// AI schemas
+export const aiConfigSchema = z.object({
+  provider: z.enum(['anthropic', 'openai', 'gemini']),
+  apiKey: z.string().min(1, 'API key is required'),
+  model: z.string().optional(),
+});
+
+export const aiSummarizeSchema = z.object({
+  content: z.string().min(1, 'Content is required'),
+  maxLength: z.number().int().min(10).max(1000).default(100).optional(),
+});
+
+export const aiSuggestTitleSchema = z.object({
+  content: z.string().min(1, 'Content is required'),
+  maxLength: z.number().int().min(10).max(100).default(60).optional(),
+});
+
+export const aiSuggestTagsSchema = z.object({
+  content: z.string().min(1, 'Content is required'),
+  maxTags: z.number().int().min(1).max(20).default(5).optional(),
+});
+
+// Tag schemas
+export const renameTagSchema = z.object({
+  name: z.string().min(1, 'Tag name is required').max(100, 'Tag name must not exceed 100 characters'),
+});
+
+export const tagSearchQuerySchema = z.object({
+  q: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(10),
+});
+
+// UUID param schema (reusable)
+export const uuidParamSchema = z.object({
+  id: z.string().uuid('Invalid ID format'),
+});
+
+export const tagIdParamSchema = z.object({
+  id: z.string().uuid('Invalid tag ID'),
+});
+
 // Type exports
 export type SetupInput = z.infer<typeof setupSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
@@ -95,3 +136,9 @@ export type UpdateNoteInput = z.infer<typeof updateNoteSchema>;
 export type ListNotesQuery = z.infer<typeof listNotesQuerySchema>;
 export type CreateFolderInput = z.infer<typeof createFolderSchema>;
 export type UpdateFolderInput = z.infer<typeof updateFolderSchema>;
+export type AIConfigInput = z.infer<typeof aiConfigSchema>;
+export type AISummarizeInput = z.infer<typeof aiSummarizeSchema>;
+export type AISuggestTitleInput = z.infer<typeof aiSuggestTitleSchema>;
+export type AISuggestTagsInput = z.infer<typeof aiSuggestTagsSchema>;
+export type RenameTagInput = z.infer<typeof renameTagSchema>;
+export type TagSearchQuery = z.infer<typeof tagSearchQuerySchema>;

@@ -23,10 +23,11 @@ model User {
   updatedAt          DateTime  @updatedAt @map("updated_at")
 
   // Relations
-  sessions Session[]
-  folders  Folder[]
-  notes    Note[]
-  tags     Tag[]
+  sessions   Session[]
+  folders    Folder[]
+  notes      Note[]
+  tags       Tag[]
+  aiSettings UserAISettings?
 
   @@map("users")
 }
@@ -115,4 +116,20 @@ model SystemSetting {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("system_settings")
+}
+
+// User AI Settings (per-user AI provider configuration)
+model UserAISettings {
+  id               String   @id @default(uuid())
+  userId           String   @unique @map("user_id")
+  provider         String   @db.VarChar(20) // 'anthropic', 'openai', or 'gemini'
+  encryptedApiKey  String   @map("encrypted_api_key") @db.Text
+  model            String?  @db.VarChar(100)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_ai_settings")
 }

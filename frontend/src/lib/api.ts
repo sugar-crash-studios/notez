@@ -149,3 +149,24 @@ export const tagsApi = {
 
   stats: () => api.get('/api/tags/stats'),
 };
+
+export const aiApi = {
+  // AI Settings (Admin only)
+  getSettings: () => api.get('/api/ai/settings'),
+
+  saveSettings: (data: { provider: 'anthropic' | 'openai' | 'gemini'; apiKey: string; model?: string }) =>
+    api.put('/api/ai/settings', data),
+
+  testConnection: (data: { provider: 'anthropic' | 'openai' | 'gemini'; apiKey: string; model?: string }) =>
+    api.post('/api/ai/test-connection', data),
+
+  // AI Features
+  summarize: (data: { content: string; maxLength?: number }) =>
+    api.post('/api/ai/summarize', data),
+
+  suggestTitle: (data: { content: string; maxLength?: number }) =>
+    api.post('/api/ai/suggest-title', data),
+
+  suggestTags: (data: { content: string; maxTags?: number }) =>
+    api.post('/api/ai/suggest-tags', data),
+};

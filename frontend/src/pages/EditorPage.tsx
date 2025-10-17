@@ -1,11 +1,14 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FolderSidebar } from '../components/FolderSidebar';
 import { NoteList } from '../components/NoteList';
 import { NoteEditor } from '../components/NoteEditor';
 import { useAuth } from '../contexts/AuthContext';
+import { Settings } from 'lucide-react';
 
 export function EditorPage() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
@@ -19,6 +22,13 @@ export function EditorPage() {
           <h1 className="text-xl font-bold text-gray-900">Notez</h1>
         </div>
         <div className="flex items-center space-x-4">
+          <button
+            onClick={() => navigate('/settings')}
+            className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md"
+            title="Settings"
+          >
+            <Settings className="w-5 h-5" />
+          </button>
           {user?.role === 'admin' && (
             <a
               href="/admin"

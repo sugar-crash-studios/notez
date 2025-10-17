@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Editor from '@monaco-editor/react';
-import { notesApi } from '../lib/api';
-import { Save, Trash2 } from 'lucide-react';
+import { notesApi, aiApi } from '../lib/api';
+import { Save, Trash2, Sparkles, FileText as FileTextIcon, Tags } from 'lucide-react';
 import { TagInput } from './TagInput';
 
 interface Note {
@@ -27,6 +27,8 @@ export function NoteEditor({ noteId, onNoteDeleted }: NoteEditorProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [aiLoading, setAiLoading] = useState<'summarize' | 'title' | 'tags' | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load note when noteId changes
@@ -129,6 +131,91 @@ export function NoteEditor({ noteId, onNoteDeleted }: NoteEditorProps) {
     saveNote();
   };
 
+  const handleAISummarize = async () => {
+    if (!content.trim()) {
+      setAiError('Please add some content to summarize');
+      return;
+    }
+
+    setAiLoading('summarize');
+    setAiError(null);
+
+    try {
+      const response = await aiApi.summarize({ content });
+      const summary = response.data.summary;
+
+      // Insert summary at the beginning of content
+      const newContent = `**AI Summary:**\n${summary}\n\n---\n\n${content}`;
+      setContent(newContent);
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.message || 'Failed to generate summary';
+      setAiError(errorMsg);
+    } finally {
+      setAiLoading(null);
+    }
+  };
+
+  const handleAISuggestTitle = async () => {
+    if (!content.trim()) {
+      setAiError('Please add some content to generate a title');
+      return;
+    }
+
+    setAiLoading('title');
+    setAiError(null);
+
+    try {
+      const response = await aiApi.suggestTitle({ content });
+      const suggestedTitle = response.data.title;
+
+      // Only set if title is empty or user confirms
+      if (!title.trim()) {
+        setTitle(suggestedTitle);
+      } else {
+        if (confirm(`Replace current title with: "${suggestedTitle}"?`)) {
+          setTitle(suggestedTitle);
+        }
+      }
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.message || 'Failed to suggest title';
+      setAiError(errorMsg);
+    } finally {
+      setAiLoading(null);
+    }
+  };
+
+  const handleAISuggestTags = async () => {
+    if (!content.trim()) {
+      setAiError('Please add some content to suggest tags');
+      return;
+    }
+
+    setAiLoading('tags');
+    setAiError(null);
+
+    try {
+      const response = await aiApi.suggestTags({ content });
+      const suggestedTags = response.data.tags;
+
+      // Merge with existing tags (avoid duplicates)
+      const existingTagNames = tags.map((t) => t.name.toLowerCase());
+      const newTagObjects = suggestedTags
+        .filter((tagName: string) => !existingTagNames.includes(tagName.toLowerCase()))
+        .map((tagName: string) => ({ id: '', name: tagName }));
+
+      if (newTagObjects.length > 0) {
+        setTags([...tags, ...newTagObjects]);
+      } else {
+        setAiError('All suggested tags are already added');
+      }
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.message || 'Failed to suggest tags';
+      setAiError(errorMsg);
+    } finally {
+      setAiLoading(null);
+    }
+  };
+
   if (!noteId) {
     return (
       <div className="flex-1 flex items-center justify-center bg-gray-50">
@@ -203,6 +290,73 @@ export function NoteEditor({ noteId, onNoteDeleted }: NoteEditorProps) {
             setTags(newTags);
           }}
         />
+
+        {/* AI Actions */}
+        <div className="flex items-center space-x-2 pt-2">
+          <Sparkles className="w-4 h-4 text-purple-600" />
+          <span className="text-sm font-medium text-gray-700">AI Actions:</span>
+
+          <button
+            onClick={handleAISummarize}
+            disabled={!content.trim() || aiLoading === 'summarize'}
+            className="px-3 py-1 text-xs font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+            title="Generate summary and add to beginning of note"
+          >
+            {aiLoading === 'summarize' ? (
+              <>
+                <span className="inline-block animate-spin">⏳</span>
+                <span>Summarizing...</span>
+              </>
+            ) : (
+              <>
+                <FileTextIcon className="w-3 h-3" />
+                <span>Summarize</span>
+              </>
+            )}
+          </button>
+
+          <button
+            onClick={handleAISuggestTitle}
+            disabled={!content.trim() || aiLoading === 'title'}
+            className="px-3 py-1 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+            title="Suggest a title based on content"
+          >
+            {aiLoading === 'title' ? (
+              <>
+                <span className="inline-block animate-spin">⏳</span>
+                <span>Generating...</span>
+              </>
+            ) : (
+              <>
+                <FileTextIcon className="w-3 h-3" />
+                <span>Suggest Title</span>
+              </>
+            )}
+          </button>
+
+          <button
+            onClick={handleAISuggestTags}
+            disabled={!content.trim() || aiLoading === 'tags'}
+            className="px-3 py-1 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+            title="Suggest relevant tags"
+          >
+            {aiLoading === 'tags' ? (
+              <>
+                <span className="inline-block animate-spin">⏳</span>
+                <span>Suggesting...</span>
+              </>
+            ) : (
+              <>
+                <Tags className="w-3 h-3" />
+                <span>Suggest Tags</span>
+              </>
+            )}
+          </button>
+
+          {aiError && (
+            <span className="text-xs text-red-600">{aiError}</span>
+          )}
+        </div>
       </div>
 
       {/* Monaco Editor */}

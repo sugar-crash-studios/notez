@@ -142,7 +142,7 @@ export function AdminPage() {
       {/* Main Content */}
       <div className="max-w-6xl mx-auto py-8 px-4">
         <div className="bg-white rounded-lg shadow">
-          {/* Header */}
+          {/* User Management Header */}
           <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <Users className="w-6 h-6 text-gray-600" />
