@@ -20,7 +20,7 @@ services:
 
   # Database migrations (run once before backend starts)
   migrations:
-    image: ghcr.io/yourusername/notez-backend:latest
+    image: ghcr.io/spasticpalate/notez:main
     container_name: notez-migrations
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-notez}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-notez}?schema=public
@@ -29,16 +29,17 @@ services:
         condition: service_healthy
     networks:
       - notez-network
-    command: npx prisma migrate deploy
+    command: ["node", "backend/dist/index.js"]
+    entrypoint: ["sh", "-c", "cd /app/backend && npx prisma migrate deploy"]
     restart: "no"
 
-  # Backend API
+  # Backend API (serves both API and frontend static files)
   backend:
-    image: ghcr.io/yourusername/notez-backend:latest
+    image: ghcr.io/spasticpalate/notez:main
     container_name: notez-backend
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "80:3000"
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -54,19 +55,6 @@ services:
         condition: service_healthy
       migrations:
         condition: service_completed_successfully
-    networks:
-      - notez-network
-    command: ["node", "dist/index.js"]
-
-  # Frontend
-  frontend:
-    image: ghcr.io/yourusername/notez-frontend:latest
-    container_name: notez-frontend
-    restart: unless-stopped
-    ports:
-      - "80:80"
-    depends_on:
-      - backend
     networks:
       - notez-network
 
