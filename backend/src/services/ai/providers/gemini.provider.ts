@@ -116,6 +116,17 @@ export class GeminiProvider implements AIProvider {
     }
   }
 
+  async listModels(): Promise<Array<{ id: string; name: string; description?: string }>> {
+    // Google Gemini doesn't have a public list models API endpoint
+    // Return hardcoded list of current models
+    return [
+      { id: 'gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash (Experimental)', description: 'Latest experimental model' },
+      { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', description: 'Most capable model' },
+      { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', description: 'Fast and efficient' },
+      { id: 'gemini-1.0-pro', name: 'Gemini 1.0 Pro', description: 'Previous generation' },
+    ];
+  }
+
   private handleError(error: any, operation: string): never {
     // Check for rate limiting
     if (error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED')) {

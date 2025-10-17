@@ -15,6 +15,7 @@ export function AISettings() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+  const [isFetchingModels, setIsFetchingModels] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -23,6 +24,7 @@ export function AISettings() {
   const [provider, setProvider] = useState<AIProvider>('anthropic');
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('');
+  const [availableModels, setAvailableModels] = useState<Array<{ id: string; name: string; description?: string }>>([]);
 
   useEffect(() => {
     loadSettings();
@@ -46,6 +48,35 @@ export function AISettings() {
     }
   };
 
+  const fetchAvailableModels = async () => {
+    if (!apiKey || apiKey.length < 10) return;
+
+    setIsFetchingModels(true);
+    try {
+      const response = await aiApi.listModels({
+        provider,
+        apiKey,
+        model: model || providerInfo[provider].defaultModel,
+      });
+
+      if (response.data.success && response.data.models && response.data.models.length > 0) {
+        setAvailableModels(response.data.models);
+        // If current model not in list, select first one
+        if (!response.data.models.find((m: any) => m.id === model)) {
+          setModel(response.data.models[0].id);
+        }
+      } else {
+        // Fall back to hardcoded models
+        setAvailableModels(providerInfo[provider].models);
+      }
+    } catch (err: any) {
+      console.warn('Failed to fetch models, using fallback:', err);
+      setAvailableModels(providerInfo[provider].models);
+    } finally {
+      setIsFetchingModels(false);
+    }
+  };
+
   const handleTestConnection = async () => {
     setIsTesting(true);
     setTestResult(null);
@@ -62,6 +93,11 @@ export function AISettings() {
         success: response.data.success,
         message: response.data.message || 'Connection successful',
       });
+
+      // On successful test, fetch available models
+      if (response.data.success) {
+        await fetchAvailableModels();
+      }
     } catch (err: any) {
       setTestResult({
         success: false,
@@ -258,24 +294,28 @@ export function AISettings() {
           {/* Model Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
-              Model
+              Model {isFetchingModels && <span className="text-xs text-gray-500">(Loading...)</span>}
             </label>
             <select
-              value={model || providerInfo[provider].defaultModel}
+              value={model || (availableModels.length > 0 ? availableModels[0].id : providerInfo[provider].defaultModel)}
               onChange={(e) => {
                 setModel(e.target.value);
                 setTestResult(null);
               }}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              disabled={isFetchingModels}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white disabled:opacity-50"
             >
-              {providerInfo[provider].models.map((modelOption) => (
-                <option key={modelOption.value} value={modelOption.value}>
-                  {modelOption.label} - {modelOption.description}
+              {(availableModels.length > 0 ? availableModels : providerInfo[provider].models).map((modelOption) => (
+                <option key={modelOption.id || modelOption.value} value={modelOption.id || modelOption.value}>
+                  {modelOption.name || modelOption.label}
+                  {modelOption.description && ` - ${modelOption.description}`}
                 </option>
               ))}
             </select>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Default: {providerInfo[provider].models.find(m => m.value === providerInfo[provider].defaultModel)?.label}
+              {availableModels.length > 0
+                ? 'Models loaded from API'
+                : 'Test connection to load available models'}
             </p>
           </div>
 

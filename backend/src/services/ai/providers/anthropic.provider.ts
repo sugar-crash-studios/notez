@@ -132,6 +132,43 @@ export class AnthropicProvider implements AIProvider {
     }
   }
 
+  async listModels(): Promise<Array<{ id: string; name: string; description?: string }>> {
+    try {
+      // Fetch models from Anthropic API
+      const apiKey = this.client.apiKey || '';
+      const response = await fetch('https://api.anthropic.com/v1/models', {
+        method: 'GET',
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch models: ${response.statusText}`);
+      }
+
+      const data: any = await response.json();
+
+      // Transform API response to our format
+      return data.data.map((model: any) => ({
+        id: model.id,
+        name: model.display_name || model.id,
+        description: model.created_at ? `Released ${new Date(model.created_at).toLocaleDateString()}` : undefined,
+      }));
+    } catch (error: any) {
+      // If fetching fails, return hardcoded list of current models as fallback
+      console.warn('Failed to fetch Anthropic models, using fallback list:', error.message);
+      return [
+        { id: 'claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5', description: 'Most capable model (Sep 2025)' },
+        { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5', description: 'Fast and efficient (Oct 2025)' },
+        { id: 'claude-opus-4-1-20250805', name: 'Claude Opus 4.1', description: 'Previous flagship (Aug 2025)' },
+        { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet', description: 'Previous generation (Oct 2024)' },
+        { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku', description: 'Previous generation (Oct 2024)' },
+      ];
+    }
+  }
+
   private handleError(error: any, operation: string): never {
     // Check for rate limiting
     if (error.status === 429) {

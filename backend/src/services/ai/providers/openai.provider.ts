@@ -148,6 +148,38 @@ export class OpenAIProvider implements AIProvider {
     }
   }
 
+  async listModels(): Promise<Array<{ id: string; name: string; description?: string }>> {
+    try {
+      // OpenAI has a native models endpoint
+      const models = await this.client.models.list();
+
+      // Filter to only show GPT models (exclude deprecated and non-chat models)
+      const gptModels = [];
+      for await (const model of models) {
+        if (model.id.startsWith('gpt-')) {
+          gptModels.push({
+            id: model.id,
+            name: model.id.toUpperCase().replace(/-/g, ' '),
+            description: model.created ? `Created ${new Date(model.created * 1000).toLocaleDateString()}` : undefined,
+          });
+        }
+      }
+
+      // Sort by ID descending (newest first)
+      return gptModels.sort((a, b) => b.id.localeCompare(a.id));
+    } catch (error: any) {
+      // If fetching fails, return hardcoded list as fallback
+      console.warn('Failed to fetch OpenAI models, using fallback list:', error.message);
+      return [
+        { id: 'gpt-4o', name: 'GPT-4o', description: 'Most capable GPT-4 model' },
+        { id: 'gpt-4o-mini', name: 'GPT-4o Mini', description: 'Fast and cost-effective' },
+        { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', description: 'Fast GPT-4 variant' },
+        { id: 'gpt-4', name: 'GPT-4', description: 'Standard GPT-4' },
+        { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', description: 'Fast and economical' },
+      ];
+    }
+  }
+
   private handleError(error: any, operation: string): never {
     // Check for rate limiting
     if (error.status === 429) {

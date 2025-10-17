@@ -110,6 +110,19 @@ export class AIService {
   }
 
   /**
+   * List available models from AI provider
+   * @param config AI provider configuration
+   * @returns Array of available models with their details
+   */
+  async listModels(config: AIProviderConfig): Promise<Array<{ id: string; name: string; description?: string }>> {
+    const provider = this.createProvider(config);
+    if ('listModels' in provider && typeof provider.listModels === 'function') {
+      return provider.listModels();
+    }
+    throw new Error('Provider does not support listing models');
+  }
+
+  /**
    * Summarize note content for a specific user
    * @param userId User ID
    * @param options Summarization options
