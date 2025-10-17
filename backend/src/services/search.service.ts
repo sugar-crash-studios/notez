@@ -97,38 +97,48 @@ export class SearchService {
 
     const total = Number(countResult[0]?.count || 0);
 
-    // Fetch folder and tag data for results
-    const enrichedResults = await Promise.all(
-      results.map(async (result) => {
-        const note = await prisma.note.findUnique({
-          where: { id: result.id },
+    // Fetch folder and tag data for all results in a single batch query
+    // This prevents N+1 query performance issue
+    const noteIds = results.map((r) => r.id);
+    const notesWithRelations = await prisma.note.findMany({
+      where: { id: { in: noteIds } },
+      include: {
+        folder: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        tags: {
           include: {
-            folder: {
+            tag: {
               select: {
                 id: true,
                 name: true,
               },
             },
-            tags: {
-              include: {
-                tag: {
-                  select: {
-                    id: true,
-                    name: true,
-                  },
-                },
-              },
-            },
           },
-        });
+        },
+      },
+    });
 
-        return {
-          ...result,
-          folder: note?.folder || null,
-          tags: note?.tags.map((nt) => nt.tag) || [],
-        };
-      })
+    // Create a map for O(1) lookup
+    const relationsMap = new Map(
+      notesWithRelations.map((n) => [
+        n.id,
+        {
+          folder: n.folder,
+          tags: n.tags.map((nt) => nt.tag),
+        },
+      ])
     );
+
+    // Enrich results with folder and tag data
+    const enrichedResults = results.map((result) => ({
+      ...result,
+      folder: relationsMap.get(result.id)?.folder || null,
+      tags: relationsMap.get(result.id)?.tags || [],
+    }));
 
     return {
       results: enrichedResults,

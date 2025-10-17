@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Search, X, FileText, Loader2 } from 'lucide-react';
 import { searchApi } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
+import DOMPurify from 'dompurify';
 
 interface SearchResult {
   id: string;
@@ -152,7 +153,12 @@ export function SearchBar() {
                         {result.snippet && (
                           <p
                             className="text-xs text-gray-600 mt-1 line-clamp-2"
-                            dangerouslySetInnerHTML={{ __html: result.snippet }}
+                            dangerouslySetInnerHTML={{
+                              __html: DOMPurify.sanitize(result.snippet, {
+                                ALLOWED_TAGS: ['b', 'strong', 'i', 'em', 'mark'],
+                                ALLOWED_ATTR: []
+                              })
+                            }}
                           />
                         )}
                         <div className="flex items-center gap-2 mt-2">
