@@ -139,11 +139,11 @@ export function AISettings() {
       description: 'Claude models - Powerful and versatile',
       keyFormat: 'sk-ant-api03-...',
       models: [
-        { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet (Recommended)', description: 'Most capable model' },
-        { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku (Latest)', description: 'Fast and efficient' },
-        { value: 'claude-3-opus-20240229', label: 'Claude 3 Opus', description: 'Previous generation flagship' },
-        { value: 'claude-3-sonnet-20240229', label: 'Claude 3 Sonnet', description: 'Balanced performance' },
-        { value: 'claude-3-haiku-20240307', label: 'Claude 3 Haiku', description: 'Fast and cost-effective' },
+        { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet (Recommended)', description: 'Most capable model' },
+        { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku (Latest)', description: 'Fast and efficient' },
+        { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus', description: 'Previous generation flagship' },
+        { id: 'claude-3-sonnet-20240229', name: 'Claude 3 Sonnet', description: 'Balanced performance' },
+        { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku', description: 'Fast and cost-effective' },
       ],
     },
     openai: {
@@ -152,11 +152,11 @@ export function AISettings() {
       description: 'GPT models - Versatile and powerful',
       keyFormat: 'sk-...',
       models: [
-        { value: 'gpt-4o', label: 'GPT-4o (Recommended)', description: 'Most capable GPT-4 model' },
-        { value: 'gpt-4o-mini', label: 'GPT-4o Mini', description: 'Fast and cost-effective' },
-        { value: 'gpt-4-turbo', label: 'GPT-4 Turbo', description: 'Fast GPT-4 variant' },
-        { value: 'gpt-4', label: 'GPT-4', description: 'Standard GPT-4' },
-        { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo', description: 'Fast and economical' },
+        { id: 'gpt-4o', name: 'GPT-4o (Recommended)', description: 'Most capable GPT-4 model' },
+        { id: 'gpt-4o-mini', name: 'GPT-4o Mini', description: 'Fast and cost-effective' },
+        { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', description: 'Fast GPT-4 variant' },
+        { id: 'gpt-4', name: 'GPT-4', description: 'Standard GPT-4' },
+        { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', description: 'Fast and economical' },
       ],
     },
     gemini: {
@@ -165,9 +165,9 @@ export function AISettings() {
       description: 'Gemini models - Fast and efficient',
       keyFormat: 'AIza...',
       models: [
-        { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro (Recommended)', description: 'Most capable model' },
-        { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash', description: 'Fast and efficient' },
-        { value: 'gemini-1.0-pro', label: 'Gemini 1.0 Pro', description: 'Previous generation' },
+        { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro (Recommended)', description: 'Most capable model' },
+        { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', description: 'Fast and efficient' },
+        { id: 'gemini-1.0-pro', name: 'Gemini 1.0 Pro', description: 'Previous generation' },
       ],
     },
   };
@@ -306,8 +306,8 @@ export function AISettings() {
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white disabled:opacity-50"
             >
               {(availableModels.length > 0 ? availableModels : providerInfo[provider].models).map((modelOption) => (
-                <option key={modelOption.id || modelOption.value} value={modelOption.id || modelOption.value}>
-                  {modelOption.name || modelOption.label}
+                <option key={modelOption.id} value={modelOption.id}>
+                  {modelOption.name}
                   {modelOption.description && ` - ${modelOption.description}`}
                 </option>
               ))}
