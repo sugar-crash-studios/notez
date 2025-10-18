@@ -8,6 +8,10 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  // DATABASE_URL can be:
+  // 1. Explicitly set as postgresql://user:pass@host:port/db
+  // 2. Auto-constructed from POSTGRES_USER, POSTGRES_PASSWORD, etc.
+  // See backend/src/lib/database-url.ts for construction logic
   url      = env("DATABASE_URL")
 }
 

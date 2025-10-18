@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import jwt from '@fastify/jwt';
 import 'dotenv/config';
+import { getDatabaseUrl, getDatabaseUrlSafe } from './lib/database-url.js';
 import { authRoutes } from './routes/auth.routes.js';
 import { usersRoutes } from './routes/users.routes.js';
 import { notesRoutes } from './routes/notes.routes.js';
@@ -11,6 +12,18 @@ import { tagRoutes } from './routes/tags.routes.js';
 import { aiRoutes } from './routes/ai.routes.js';
 import { searchRoutes } from './routes/search.routes.js';
 import { prisma, disconnectPrisma } from './lib/db.js';
+
+// Configure DATABASE_URL from components if not explicitly set
+// This allows using POSTGRES_USER, POSTGRES_PASSWORD, etc. instead of hardcoded URL
+if (!process.env.DATABASE_URL) {
+  try {
+    process.env.DATABASE_URL = getDatabaseUrl();
+    console.log(`📊 Database URL configured from components: ${getDatabaseUrlSafe()}`);
+  } catch (error) {
+    console.error('❌ Failed to configure database URL:', error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
+}
 const fastify = Fastify({
   logger: {
     level: process.env.LOG_LEVEL || 'info',
