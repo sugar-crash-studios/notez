@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { foldersApi, tagsApi } from '../lib/api';
 import { ChevronLeft, ChevronRight, Folder, FolderPlus, Tag, ChevronDown, ChevronUp } from 'lucide-react';
+import { EditableListItem } from './EditableListItem';
 
 interface FolderData {
   id: string;
@@ -76,6 +77,78 @@ export function FolderSidebar({
       loadFolders();
     } catch (error: any) {
       alert(error.response?.data?.message || 'Failed to create folder');
+    }
+  };
+
+  const handleRenameFolder = async (folderId: string, newName: string) => {
+    // Optimistic update
+    const originalFolders = folders;
+    const updatedFolders = folders.map((f) =>
+      f.id === folderId ? { ...f, name: newName } : f
+    );
+    setFolders(updatedFolders);
+
+    try {
+      await foldersApi.update(folderId, { name: newName });
+    } catch (error: any) {
+      alert(error.response?.data?.message || 'Failed to rename folder');
+      setFolders(originalFolders); // Revert on error
+    }
+  };
+
+  const handleDeleteFolder = async (folderId: string, folderName: string) => {
+    if (!confirm(`Delete folder "${folderName}"? Notes in this folder will be moved to unfiled.`)) {
+      return;
+    }
+
+    // Optimistic update
+    const originalFolders = folders;
+    setFolders(folders.filter((f) => f.id !== folderId));
+    if (selectedFolderId === folderId) {
+      onSelectFolder(null);
+    }
+
+    try {
+      await foldersApi.delete(folderId);
+    } catch (error: any) {
+      alert(error.response?.data?.message || 'Failed to delete folder');
+      setFolders(originalFolders); // Revert on error
+    }
+  };
+
+  const handleRenameTag = async (tagId: string, newName: string) => {
+    // Optimistic update
+    const originalTags = tags;
+    const updatedTags = tags.map((t) =>
+      t.id === tagId ? { ...t, name: newName } : t
+    );
+    setTags(updatedTags);
+
+    try {
+      await tagsApi.rename(tagId, newName);
+    } catch (error: any) {
+      alert(error.response?.data?.message || 'Failed to rename tag');
+      setTags(originalTags); // Revert on error
+    }
+  };
+
+  const handleDeleteTag = async (tagId: string, tagName: string) => {
+    if (!confirm(`Delete tag "${tagName}"? This will remove it from all notes.`)) {
+      return;
+    }
+
+    // Optimistic update
+    const originalTags = tags;
+    setTags(tags.filter((t) => t.id !== tagId));
+    if (selectedTagId === tagId) {
+      onSelectTag(null);
+    }
+
+    try {
+      await tagsApi.delete(tagId);
+    } catch (error: any) {
+      alert(error.response?.data?.message || 'Failed to delete tag');
+      setTags(originalTags); // Revert on error
     }
   };
 
@@ -173,19 +246,17 @@ export function FolderSidebar({
           </div>
         ) : (
           folders.map((folder) => (
-            <button
+            <EditableListItem
               key={folder.id}
-              onClick={() => onSelectFolder(folder.id)}
-              className={`w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 dark:bg-gray-700 ${
-                selectedFolderId === folder.id ? 'bg-blue-50 border-l-4 border-blue-600' : ''
-              }`}
-            >
-              <div className="flex items-center space-x-3">
-                <Folder className="w-5 h-5 text-gray-400 dark:text-gray-500" />
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{folder.name}</span>
-              </div>
-              <span className="text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500">{folder.noteCount}</span>
-            </button>
+              id={folder.id}
+              name={folder.name}
+              count={folder.noteCount}
+              icon={<Folder className="w-5 h-5 text-gray-400 dark:text-gray-500" />}
+              isSelected={selectedFolderId === folder.id}
+              onSelect={() => onSelectFolder(folder.id)}
+              onRename={handleRenameFolder}
+              onDelete={handleDeleteFolder}
+            />
           ))
         )}
 
@@ -214,16 +285,17 @@ export function FolderSidebar({
                 </div>
               ) : (
                 tags.map((tag) => (
-                  <button
+                  <EditableListItem
                     key={tag.id}
-                    onClick={() => onSelectTag(tag.id)}
-                    className={`w-full px-4 py-2 pl-12 flex items-center justify-between hover:bg-gray-50 dark:bg-gray-700 text-left ${
-                      selectedTagId === tag.id ? 'bg-blue-50 border-l-4 border-blue-600' : ''
-                    }`}
-                  >
-                    <span className="text-sm text-gray-700 dark:text-gray-200">{tag.name}</span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500">{tag.noteCount}</span>
-                  </button>
+                    id={tag.id}
+                    name={tag.name}
+                    count={tag.noteCount}
+                    isSelected={selectedTagId === tag.id}
+                    onSelect={() => onSelectTag(tag.id)}
+                    onRename={handleRenameTag}
+                    onDelete={handleDeleteTag}
+                    indent={true}
+                  />
                 ))
               )}
             </div>
