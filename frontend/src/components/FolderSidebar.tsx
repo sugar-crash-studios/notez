@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { foldersApi, tagsApi } from '../lib/api';
-import { ChevronLeft, ChevronRight, Folder, FolderPlus, Tag, ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Folder, FolderPlus, Tag, ChevronDown, ChevronUp, Pencil, Trash2, X, Check } from 'lucide-react';
 
 interface FolderData {
   id: string;
@@ -39,6 +39,10 @@ export function FolderSidebar({
   const [showNewFolderInput, setShowNewFolderInput] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [tagsExpanded, setTagsExpanded] = useState(true);
+  const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
+  const [editingFolderName, setEditingFolderName] = useState('');
+  const [editingTagId, setEditingTagId] = useState<string | null>(null);
+  const [editingTagName, setEditingTagName] = useState('');
 
   useEffect(() => {
     loadFolders();
@@ -76,6 +80,84 @@ export function FolderSidebar({
       loadFolders();
     } catch (error: any) {
       alert(error.response?.data?.message || 'Failed to create folder');
+    }
+  };
+
+  const handleStartEditFolder = (folder: FolderData) => {
+    setEditingFolderId(folder.id);
+    setEditingFolderName(folder.name);
+  };
+
+  const handleCancelEditFolder = () => {
+    setEditingFolderId(null);
+    setEditingFolderName('');
+  };
+
+  const handleSaveFolder = async (folderId: string) => {
+    if (!editingFolderName.trim()) return;
+
+    try {
+      await foldersApi.update(folderId, { name: editingFolderName.trim() });
+      setEditingFolderId(null);
+      setEditingFolderName('');
+      loadFolders();
+    } catch (error: any) {
+      alert(error.response?.data?.message || 'Failed to rename folder');
+    }
+  };
+
+  const handleDeleteFolder = async (folderId: string, folderName: string) => {
+    if (!confirm(`Delete folder "${folderName}"? Notes in this folder will be moved to unfiled.`)) {
+      return;
+    }
+
+    try {
+      await foldersApi.delete(folderId);
+      if (selectedFolderId === folderId) {
+        onSelectFolder(null);
+      }
+      loadFolders();
+    } catch (error: any) {
+      alert(error.response?.data?.message || 'Failed to delete folder');
+    }
+  };
+
+  const handleStartEditTag = (tag: TagData) => {
+    setEditingTagId(tag.id);
+    setEditingTagName(tag.name);
+  };
+
+  const handleCancelEditTag = () => {
+    setEditingTagId(null);
+    setEditingTagName('');
+  };
+
+  const handleSaveTag = async (tagId: string) => {
+    if (!editingTagName.trim()) return;
+
+    try {
+      await tagsApi.rename(tagId, editingTagName.trim());
+      setEditingTagId(null);
+      setEditingTagName('');
+      loadTags();
+    } catch (error: any) {
+      alert(error.response?.data?.message || 'Failed to rename tag');
+    }
+  };
+
+  const handleDeleteTag = async (tagId: string, tagName: string) => {
+    if (!confirm(`Delete tag "${tagName}"? This will remove it from all notes.`)) {
+      return;
+    }
+
+    try {
+      await tagsApi.delete(tagId);
+      if (selectedTagId === tagId) {
+        onSelectTag(null);
+      }
+      loadTags();
+    } catch (error: any) {
+      alert(error.response?.data?.message || 'Failed to delete tag');
     }
   };
 
@@ -173,19 +255,72 @@ export function FolderSidebar({
           </div>
         ) : (
           folders.map((folder) => (
-            <button
+            <div
               key={folder.id}
-              onClick={() => onSelectFolder(folder.id)}
-              className={`w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 dark:bg-gray-700 ${
-                selectedFolderId === folder.id ? 'bg-blue-50 border-l-4 border-blue-600' : ''
+              className={`group w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                selectedFolderId === folder.id ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-600' : ''
               }`}
             >
-              <div className="flex items-center space-x-3">
-                <Folder className="w-5 h-5 text-gray-400 dark:text-gray-500" />
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{folder.name}</span>
-              </div>
-              <span className="text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500">{folder.noteCount}</span>
-            </button>
+              {editingFolderId === folder.id ? (
+                // Edit mode
+                <div className="flex items-center space-x-2 flex-1">
+                  <Folder className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+                  <input
+                    type="text"
+                    value={editingFolderName}
+                    onChange={(e) => setEditingFolderName(e.target.value)}
+                    className="flex-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveFolder(folder.id);
+                      if (e.key === 'Escape') handleCancelEditFolder();
+                    }}
+                  />
+                  <button
+                    onClick={() => handleSaveFolder(folder.id)}
+                    className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+                    title="Save"
+                  >
+                    <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+                  </button>
+                  <button
+                    onClick={handleCancelEditFolder}
+                    className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+                    title="Cancel"
+                  >
+                    <X className="w-4 h-4 text-red-600 dark:text-red-400" />
+                  </button>
+                </div>
+              ) : (
+                // View mode
+                <>
+                  <button
+                    onClick={() => onSelectFolder(folder.id)}
+                    className="flex items-center space-x-3 flex-1"
+                  >
+                    <Folder className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{folder.name}</span>
+                  </button>
+                  <div className="flex items-center space-x-1">
+                    <span className="text-xs text-gray-500 dark:text-gray-400 mr-2">{folder.noteCount}</span>
+                    <button
+                      onClick={() => handleStartEditFolder(folder)}
+                      className="p-1 opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-opacity"
+                      title="Rename folder"
+                    >
+                      <Pencil className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteFolder(folder.id, folder.name)}
+                      className="p-1 opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-opacity"
+                      title="Delete folder"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           ))
         )}
 
@@ -214,16 +349,70 @@ export function FolderSidebar({
                 </div>
               ) : (
                 tags.map((tag) => (
-                  <button
+                  <div
                     key={tag.id}
-                    onClick={() => onSelectTag(tag.id)}
-                    className={`w-full px-4 py-2 pl-12 flex items-center justify-between hover:bg-gray-50 dark:bg-gray-700 text-left ${
-                      selectedTagId === tag.id ? 'bg-blue-50 border-l-4 border-blue-600' : ''
+                    className={`group w-full px-4 py-2 pl-12 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                      selectedTagId === tag.id ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-600' : ''
                     }`}
                   >
-                    <span className="text-sm text-gray-700 dark:text-gray-200">{tag.name}</span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500">{tag.noteCount}</span>
-                  </button>
+                    {editingTagId === tag.id ? (
+                      // Edit mode
+                      <div className="flex items-center space-x-2 flex-1">
+                        <input
+                          type="text"
+                          value={editingTagName}
+                          onChange={(e) => setEditingTagName(e.target.value)}
+                          className="flex-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveTag(tag.id);
+                            if (e.key === 'Escape') handleCancelEditTag();
+                          }}
+                        />
+                        <button
+                          onClick={() => handleSaveTag(tag.id)}
+                          className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+                          title="Save"
+                        >
+                          <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+                        </button>
+                        <button
+                          onClick={handleCancelEditTag}
+                          className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+                          title="Cancel"
+                        >
+                          <X className="w-4 h-4 text-red-600 dark:text-red-400" />
+                        </button>
+                      </div>
+                    ) : (
+                      // View mode
+                      <>
+                        <button
+                          onClick={() => onSelectTag(tag.id)}
+                          className="flex-1 text-left"
+                        >
+                          <span className="text-sm text-gray-700 dark:text-gray-200">{tag.name}</span>
+                        </button>
+                        <div className="flex items-center space-x-1">
+                          <span className="text-xs text-gray-500 dark:text-gray-400 mr-2">{tag.noteCount}</span>
+                          <button
+                            onClick={() => handleStartEditTag(tag)}
+                            className="p-1 opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-opacity"
+                            title="Rename tag"
+                          >
+                            <Pencil className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTag(tag.id, tag.name)}
+                            className="p-1 opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-opacity"
+                            title="Delete tag"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 ))
               )}
             </div>
