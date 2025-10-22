@@ -16,10 +16,11 @@ interface Note {
 
 interface NoteEditorProps {
   noteId: string | null;
-  onNoteDeleted: () => void;
+  onNoteDeleted: (noteId: string) => void;
+  onTagsChanged?: () => void;
 }
 
-export function NoteEditor({ noteId, onNoteDeleted }: NoteEditorProps) {
+export function NoteEditor({ noteId, onNoteDeleted, onTagsChanged }: NoteEditorProps) {
   const [note, setNote] = useState<Note | null>(null);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -104,6 +105,11 @@ export function NoteEditor({ noteId, onNoteDeleted }: NoteEditorProps) {
       setTitle(updatedNote.title);
       setContent(updatedNote.content || '');
       setTags(updatedNote.tags || []);
+
+      // Notify parent if tags changed
+      if (tagsChanged) {
+        onTagsChanged?.();
+      }
     } catch (error) {
       console.error('Failed to save note:', error);
     } finally {
@@ -116,8 +122,9 @@ export function NoteEditor({ noteId, onNoteDeleted }: NoteEditorProps) {
     if (!confirm(`Delete "${note.title}"?`)) return;
 
     try {
-      await notesApi.delete(note.id);
-      onNoteDeleted();
+      const deletedNoteId = note.id;
+      await notesApi.delete(deletedNoteId);
+      onNoteDeleted(deletedNoteId);
     } catch (error) {
       console.error('Failed to delete note:', error);
       alert('Failed to delete note');

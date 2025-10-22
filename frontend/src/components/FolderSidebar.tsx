@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { foldersApi, tagsApi } from '../lib/api';
 import { ChevronLeft, ChevronRight, Folder, FolderPlus, Tag, ChevronDown, ChevronUp } from 'lucide-react';
 import { EditableListItem } from './EditableListItem';
@@ -26,14 +26,20 @@ interface FolderSidebarProps {
   onToggleCollapse: () => void;
 }
 
-export function FolderSidebar({
+export interface FolderSidebarHandle {
+  refreshFolders: () => void;
+  refreshTags: () => void;
+  refreshAll: () => void;
+}
+
+export const FolderSidebar = forwardRef<FolderSidebarHandle, FolderSidebarProps>(({
   selectedFolderId,
   selectedTagId,
   onSelectFolder,
   onSelectTag,
   collapsed,
   onToggleCollapse,
-}: FolderSidebarProps) {
+}, ref) => {
   const [folders, setFolders] = useState<FolderData[]>([]);
   const [tags, setTags] = useState<TagData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,6 +51,16 @@ export function FolderSidebar({
     loadFolders();
     loadTags();
   }, []);
+
+  // Expose refresh methods to parent
+  useImperativeHandle(ref, () => ({
+    refreshFolders: loadFolders,
+    refreshTags: loadTags,
+    refreshAll: () => {
+      loadFolders();
+      loadTags();
+    }
+  }));
 
   const loadFolders = async () => {
     try {
@@ -304,4 +320,4 @@ export function FolderSidebar({
       </div>
     </div>
   );
-}
+});

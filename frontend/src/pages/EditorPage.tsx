@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { FolderSidebar } from '../components/FolderSidebar';
-import { NoteList } from '../components/NoteList';
+import { FolderSidebar, FolderSidebarHandle } from '../components/FolderSidebar';
+import { NoteList, NoteListHandle } from '../components/NoteList';
 import { NoteEditor } from '../components/NoteEditor';
 import { SearchBar } from '../components/SearchBar';
 import { ThemeToggle } from '../components/ThemeToggle';
@@ -16,6 +16,8 @@ export function EditorPage() {
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const noteListRef = useRef<NoteListHandle>(null);
+  const sidebarRef = useRef<FolderSidebarHandle>(null);
 
   // Handle URL query parameter for note selection (from search)
   useEffect(() => {
@@ -68,6 +70,7 @@ export function EditorPage() {
       <div className="flex flex-1 overflow-hidden">
         {/* Folder Sidebar */}
         <FolderSidebar
+          ref={sidebarRef}
           selectedFolderId={selectedFolderId}
           selectedTagId={selectedTagId}
           onSelectFolder={(folderId) => {
@@ -86,16 +89,30 @@ export function EditorPage() {
 
         {/* Note List */}
         <NoteList
+          ref={noteListRef}
           folderId={selectedFolderId}
           tagId={selectedTagId}
           selectedNoteId={selectedNoteId}
           onSelectNote={setSelectedNoteId}
+          onNoteCreated={() => {
+            // Refresh sidebar counts after note creation
+            sidebarRef.current?.refreshFolders();
+          }}
         />
 
         {/* Note Editor */}
         <NoteEditor
           noteId={selectedNoteId}
-          onNoteDeleted={() => setSelectedNoteId(null)}
+          onNoteDeleted={(noteId) => {
+            setSelectedNoteId(null);
+            noteListRef.current?.removeNote(noteId);
+            // Refresh sidebar counts after deletion
+            sidebarRef.current?.refreshAll();
+          }}
+          onTagsChanged={() => {
+            // Refresh tag counts when tags are added/removed
+            sidebarRef.current?.refreshTags();
+          }}
         />
       </div>
     </div>

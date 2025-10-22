@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { notesApi } from '../lib/api';
 import { FileText, Plus, Search } from 'lucide-react';
 
@@ -17,9 +17,15 @@ interface NoteListProps {
   tagId: string | null;
   selectedNoteId: string | null;
   onSelectNote: (noteId: string) => void;
+  onNoteCreated?: () => void;
 }
 
-export function NoteList({ folderId, tagId, selectedNoteId, onSelectNote }: NoteListProps) {
+export interface NoteListHandle {
+  refresh: () => void;
+  removeNote: (noteId: string) => void;
+}
+
+export const NoteList = forwardRef<NoteListHandle, NoteListProps>(({ folderId, tagId, selectedNoteId, onSelectNote, onNoteCreated }, ref) => {
   const [notes, setNotes] = useState<Note[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -27,6 +33,14 @@ export function NoteList({ folderId, tagId, selectedNoteId, onSelectNote }: Note
   useEffect(() => {
     loadNotes();
   }, [folderId, tagId, searchQuery]);
+
+  // Expose methods to parent component
+  useImperativeHandle(ref, () => ({
+    refresh: loadNotes,
+    removeNote: (noteId: string) => {
+      setNotes(prevNotes => prevNotes.filter(note => note.id !== noteId));
+    }
+  }));
 
   const loadNotes = async () => {
     setIsLoading(true);
@@ -66,6 +80,8 @@ export function NoteList({ folderId, tagId, selectedNoteId, onSelectNote }: Note
       const newNote = response.data.note;
       setNotes([newNote, ...notes]);
       onSelectNote(newNote.id);
+      // Notify parent that a note was created
+      onNoteCreated?.();
     } catch (error) {
       console.error('Failed to create note:', error);
     }
@@ -163,4 +179,4 @@ export function NoteList({ folderId, tagId, selectedNoteId, onSelectNote }: Note
       </div>
     </div>
   );
-}
+});
