@@ -7,8 +7,9 @@ node_modules/
 # Build
 dist/
 
-# Prisma
-prisma/migrations/
+# Prisma (migrations SHOULD be committed)
+# Only ignore the Prisma client generated files
+prisma/generated/
 
 # Logs
 *.log
