@@ -1,6 +1,6 @@
 import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { foldersApi, tagsApi } from '../lib/api';
-import { ChevronLeft, ChevronRight, Folder, FolderPlus, Tag, ChevronDown, ChevronUp } from 'lucide-react';
+import { foldersApi, tagsApi, notesApi } from '../lib/api';
+import { ChevronLeft, ChevronRight, Folder, FolderPlus, Tag, ChevronDown, ChevronUp, FileQuestion } from 'lucide-react';
 import { EditableListItem } from './EditableListItem';
 
 interface FolderData {
@@ -42,6 +42,7 @@ export const FolderSidebar = forwardRef<FolderSidebarHandle, FolderSidebarProps>
 }, ref) => {
   const [folders, setFolders] = useState<FolderData[]>([]);
   const [tags, setTags] = useState<TagData[]>([]);
+  const [unfiledCount, setUnfiledCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [showNewFolderInput, setShowNewFolderInput] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
@@ -50,7 +51,7 @@ export const FolderSidebar = forwardRef<FolderSidebarHandle, FolderSidebarProps>
   useEffect(() => {
     const loadAll = async () => {
       setIsLoading(true);
-      await Promise.all([loadFolders(), loadTags()]);
+      await Promise.all([loadFolders(), loadTags(), loadStats()]);
       setIsLoading(false);
     };
     loadAll();
@@ -60,7 +61,7 @@ export const FolderSidebar = forwardRef<FolderSidebarHandle, FolderSidebarProps>
   useImperativeHandle(ref, () => ({
     refreshFolders: async () => {
       setIsLoading(true);
-      await loadFolders();
+      await Promise.all([loadFolders(), loadStats()]);
       setIsLoading(false);
     },
     refreshTags: async () => {
@@ -70,7 +71,7 @@ export const FolderSidebar = forwardRef<FolderSidebarHandle, FolderSidebarProps>
     },
     refreshAll: async () => {
       setIsLoading(true);
-      await Promise.all([loadFolders(), loadTags()]);
+      await Promise.all([loadFolders(), loadTags(), loadStats()]);
       setIsLoading(false);
     }
   }));
@@ -90,6 +91,15 @@ export const FolderSidebar = forwardRef<FolderSidebarHandle, FolderSidebarProps>
       setTags(response.data.tags);
     } catch (error) {
       console.error('Failed to load tags:', error);
+    }
+  };
+
+  const loadStats = async () => {
+    try {
+      const response = await notesApi.stats();
+      setUnfiledCount(response.data.unfiledNotes || 0);
+    } catch (error) {
+      console.error('Failed to load stats:', error);
     }
   };
 
@@ -257,11 +267,32 @@ export const FolderSidebar = forwardRef<FolderSidebarHandle, FolderSidebarProps>
             onSelectTag(null);
           }}
           className={`w-full px-4 py-2.5 flex items-center space-x-3 hover:bg-gray-50 dark:bg-gray-700 ${
-            selectedFolderId === null && selectedTagId === null ? 'bg-blue-50 border-l-4 border-blue-600' : ''
+            selectedFolderId === null && selectedTagId === null ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-600' : ''
           }`}
         >
           <Folder className="w-5 h-5 text-gray-400 dark:text-gray-500" />
           <span className="text-sm font-medium text-gray-700 dark:text-gray-200">All Notes</span>
+        </button>
+
+        {/* Unfiled Notes */}
+        <button
+          onClick={() => {
+            onSelectFolder('unfiled');
+            onSelectTag(null);
+          }}
+          className={`w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 ${
+            selectedFolderId === 'unfiled' ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-600' : ''
+          }`}
+        >
+          <div className="flex items-center space-x-3">
+            <FileQuestion className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Unfiled</span>
+          </div>
+          {unfiledCount > 0 && (
+            <span className="px-2 py-0.5 text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded-full">
+              {unfiledCount}
+            </span>
+          )}
         </button>
 
         {/* Folder Items */}

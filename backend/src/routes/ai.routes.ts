@@ -18,6 +18,7 @@ import {
 } from '../utils/validation.schemas.js';
 import { validateBody } from '../middleware/validate.middleware.js';
 import { authenticateToken } from '../middleware/auth.middleware.js';
+import { prisma } from '../lib/db.js';
 
 /**
  * AI Routes
@@ -277,9 +278,21 @@ export async function aiRoutes(fastify: FastifyInstance) {
         const userId = request.user!.userId;
         const { content, maxTags } = request.body;
 
+        // Fetch user's existing tags to provide context to AI
+        // Limit to 50 most recently created tags for scalability
+        const existingTags = await prisma.tag.findMany({
+          where: { userId },
+          select: { name: true },
+          orderBy: { createdAt: 'desc' },
+          take: 50,
+        });
+
+        const existingTagNames = existingTags.map((tag: { name: string }) => tag.name);
+
         const tags = await aiService.suggestTags(userId, {
           content,
           maxTags,
+          existingTags: existingTagNames,
         });
 
         reply.send({ tags });

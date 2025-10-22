@@ -47,7 +47,12 @@ export const NoteList = forwardRef<NoteListHandle, NoteListProps>(({ folderId, t
     try {
       const params: any = { limit: 100 };
       if (folderId) {
-        params.folderId = folderId;
+        // Special case: 'unfiled' means notes with no folder (folderId = null in backend)
+        if (folderId === 'unfiled') {
+          params.folderId = 'null';
+        } else {
+          params.folderId = folderId;
+        }
       }
       if (tagId) {
         params.tagId = tagId;
