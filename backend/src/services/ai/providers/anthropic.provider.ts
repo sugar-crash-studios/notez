@@ -77,7 +77,17 @@ export class AnthropicProvider implements AIProvider {
   }
 
   async suggestTags(options: AISuggestTagsOptions): Promise<string[]> {
-    const { content, maxTags = 5 } = options;
+    const { content, maxTags = 5, existingTags = [] } = options;
+
+    // Build the prompt with context about existing tags
+    let prompt = `Based on the following content, suggest up to ${maxTags} relevant tags.`;
+
+    if (existingTags.length > 0) {
+      prompt += `\n\nIMPORTANT: The user already has these tags: ${existingTags.join(', ')}`;
+      prompt += `\nPlease PREFER using existing tags when they are relevant to the content. Only create new tags if none of the existing tags are appropriate.`;
+    }
+
+    prompt += `\n\nReturn ONLY the tags as a comma-separated list, no explanations or extra text:\n\n${content}`;
 
     try {
       const response = await this.client.messages.create({
@@ -86,7 +96,7 @@ export class AnthropicProvider implements AIProvider {
         messages: [
           {
             role: 'user',
-            content: `Based on the following content, suggest up to ${maxTags} relevant tags. Return ONLY the tags as a comma-separated list, no explanations or extra text:\n\n${content}`,
+            content: prompt,
           },
         ],
       });

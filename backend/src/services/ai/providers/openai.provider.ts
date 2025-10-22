@@ -89,7 +89,17 @@ export class OpenAIProvider implements AIProvider {
   }
 
   async suggestTags(options: AISuggestTagsOptions): Promise<string[]> {
-    const { content, maxTags = 5 } = options;
+    const { content, maxTags = 5, existingTags = [] } = options;
+
+    // Build the user prompt with context about existing tags
+    let userPrompt = `Based on the following content, suggest up to ${maxTags} relevant tags.`;
+
+    if (existingTags.length > 0) {
+      userPrompt += `\n\nIMPORTANT: The user already has these tags: ${existingTags.join(', ')}`;
+      userPrompt += `\nPlease PREFER using existing tags when they are relevant to the content. Only create new tags if none of the existing tags are appropriate.`;
+    }
+
+    userPrompt += `\n\nReturn ONLY the tags as a comma-separated list, no explanations or extra text:\n\n${content}`;
 
     try {
       const response = await this.client.chat.completions.create({
@@ -98,11 +108,11 @@ export class OpenAIProvider implements AIProvider {
         messages: [
           {
             role: 'system',
-            content: 'You are a helpful assistant that suggests relevant tags for content.',
+            content: 'You are a helpful assistant that suggests relevant tags for content. When existing tags are provided, prefer reusing them over creating new ones.',
           },
           {
             role: 'user',
-            content: `Based on the following content, suggest up to ${maxTags} relevant tags. Return ONLY the tags as a comma-separated list, no explanations or extra text:\n\n${content}`,
+            content: userPrompt,
           },
         ],
         temperature: 0.4,

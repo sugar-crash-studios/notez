@@ -18,6 +18,7 @@ import {
 } from '../utils/validation.schemas.js';
 import { validateBody } from '../middleware/validate.middleware.js';
 import { authenticateToken } from '../middleware/auth.middleware.js';
+import { prisma } from '../lib/prisma.js';
 
 /**
  * AI Routes
@@ -277,9 +278,18 @@ export async function aiRoutes(fastify: FastifyInstance) {
         const userId = request.user!.userId;
         const { content, maxTags } = request.body;
 
+        // Fetch user's existing tags to provide context to AI
+        const existingTags = await prisma.tag.findMany({
+          where: { userId },
+          select: { name: true },
+        });
+
+        const existingTagNames = existingTags.map((tag) => tag.name);
+
         const tags = await aiService.suggestTags(userId, {
           content,
           maxTags,
+          existingTags: existingTagNames,
         });
 
         reply.send({ tags });

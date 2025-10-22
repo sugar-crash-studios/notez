@@ -21,6 +21,7 @@ export interface AISuggestTitleOptions {
 export interface AISuggestTagsOptions {
   content: string;
   maxTags?: number; // Max number of tags to return
+  existingTags?: string[]; // User's existing tags to prefer reusing
 }
 
 /**
