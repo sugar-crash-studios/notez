@@ -427,7 +427,7 @@ export function NoteEditor({ noteId, onNoteDeleted, onTagsChanged, onNoteUpdated
       </div>
 
       {/* Monaco Editor */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-hidden">
         <Editor
           height="100%"
           defaultLanguage="markdown"
@@ -450,7 +450,7 @@ export function NoteEditor({ noteId, onNoteDeleted, onTagsChanged, onNoteUpdated
       </div>
 
       {/* Word Count Footer */}
-      <div className="px-6 py-2 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-900">
+      <div className="flex-shrink-0 px-6 py-2 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-900">
         <div className="text-xs text-gray-500 dark:text-gray-400 space-x-4">
           <span>{content.trim() ? content.trim().split(/\s+/).length : 0} words</span>
           <span>{content.length} characters</span>

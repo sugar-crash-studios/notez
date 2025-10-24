@@ -435,7 +435,7 @@ export async function permanentlyDeleteNote(noteId: string, userId: string) {
  * Get note statistics for a user
  */
 export async function getNoteStats(userId: string) {
-  const [totalNotes, unfiledNotes, deletedNotes, foldersWithNotes] = await Promise.all([
+  const [totalNotes, unfiledNotes, deletedNotes, foldersWithNotes] = await prisma.$transaction([
     prisma.note.count({ where: { userId, deleted: false } }),
     prisma.note.count({ where: { userId, folderId: null, deleted: false } }),
     prisma.note.count({ where: { userId, deleted: true } }),
@@ -445,7 +445,11 @@ export async function getNoteStats(userId: string) {
         id: true,
         name: true,
         _count: {
-          select: { notes: true },
+          select: {
+            notes: {
+              where: { deleted: false }
+            }
+          },
         },
       },
       orderBy: {
