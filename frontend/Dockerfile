@@ -13,7 +13,7 @@ RUN npm ci
 COPY . .
 
 # Set version from package.json at build time
-ARG APP_VERSION=0.28.2
+ARG APP_VERSION=0.28.3
 ENV VITE_APP_VERSION=$APP_VERSION
 
 # Build the application
