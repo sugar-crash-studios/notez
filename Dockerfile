@@ -4,8 +4,8 @@
 # Stage 1: Build Frontend
 FROM node:20-alpine AS frontend-builder
 
-# Accept version as build argument
-ARG APP_VERSION=0.28.2
+# Accept version as build argument, which can override the package.json version
+ARG APP_VERSION
 
 WORKDIR /app/frontend
 
@@ -18,10 +18,15 @@ RUN npm ci
 # Copy frontend source
 COPY frontend/ ./
 
-# Set version environment variable for Vite
-ENV VITE_APP_VERSION=$APP_VERSION
+# Set version environment variable for Vite.
+# If APP_VERSION is not provided via build-arg, read from package.json
+RUN if [ -z "$APP_VERSION" ]; then \
+      echo "VITE_APP_VERSION=$(node -p "require('./package.json').version")" >> .env.production; \
+    else \
+      echo "VITE_APP_VERSION=$APP_VERSION" >> .env.production; \
+    fi
 
-# Build frontend for production
+# Build frontend for production (Vite will read from .env.production)
 RUN npm run build
 
 # Stage 2: Build Backend
