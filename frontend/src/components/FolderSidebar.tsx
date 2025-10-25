@@ -383,6 +383,13 @@ export const FolderSidebar = forwardRef<FolderSidebarHandle, FolderSidebarProps>
           )}
         </div>
       </div>
+
+      {/* Version Footer */}
+      <div className="mt-auto border-t border-gray-200 dark:border-gray-700 px-4 py-2 bg-gray-50 dark:bg-gray-900">
+        <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+          v{import.meta.env.VITE_APP_VERSION}
+        </p>
+      </div>
     </div>
   );
 });
