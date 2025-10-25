@@ -141,7 +141,7 @@ export function EditorPage() {
         </div>
 
         {/* Note Editor - Hidden on mobile unless mobileView === 'editor' */}
-        <div className={`${mobileView === 'editor' ? 'block' : 'hidden'} md:block flex-1 flex flex-col min-h-0`}>
+        <div className={`${mobileView === 'editor' ? '' : 'hidden'} md:flex flex-1 flex-col min-h-0`}>
           <NoteEditor
             noteId={selectedNoteId}
             onNoteDeleted={(noteId) => {
