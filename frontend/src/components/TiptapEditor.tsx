@@ -102,46 +102,39 @@ function markdownToHTML(markdown: string): string {
   if (!markdown) return '<p></p>';
 
   try {
-    console.log('📥 Converting Markdown to HTML:', markdown);
     // Use marked to parse markdown to HTML
     let html = marked.parse(markdown, { async: false }) as string;
-    console.log('🔄 After marked.parse:', html);
 
     // Post-process to handle task lists that marked might not catch
-    // Handle both with and without <p> tags wrapping the checkbox
+    // Make <p> tags optional as a group to handle all list item variations
 
     // First handle escaped brackets \[ \] (common when copying markdown)
-    html = html.replace(/<li>(<p>)?\s*\\\[\s*x\s*\\\]\s*(.*?)<\/p><\/li>/gi, (match, pTag, text) => {
-      console.log('Found escaped checked task item:', match);
+    html = html.replace(/<li>(?:<p>)?\s*\\\[\s*x\s*\\\]\s*(.*?)(?:<\/p>)?<\/li>/gi, (_match, text) => {
       return `<li data-type="taskItem" data-checked="true"><label><input type="checkbox" checked><span></span></label><div><p>${text.trim()}</p></div></li>`;
     });
 
-    html = html.replace(/<li>(<p>)?\s*\\\[\s*\\\]\s*(.*?)<\/p><\/li>/gi, (match, pTag, text) => {
-      console.log('Found escaped unchecked task item:', match);
+    html = html.replace(/<li>(?:<p>)?\s*\\\[\s*\\\]\s*(.*?)(?:<\/p>)?<\/li>/gi, (_match, text) => {
       return `<li data-type="taskItem" data-checked="false"><label><input type="checkbox"><span></span></label><div><p>${text.trim()}</p></div></li>`;
     });
 
     // Then handle normal brackets [ ]
-    html = html.replace(/<li>(<p>)?\s*\[\s*x\s*\]\s*(.*?)<\/p><\/li>/gi, (match, pTag, text) => {
-      console.log('Found checked task item:', match);
+    html = html.replace(/<li>(?:<p>)?\s*\[\s*x\s*\]\s*(.*?)(?:<\/p>)?<\/li>/gi, (_match, text) => {
       return `<li data-type="taskItem" data-checked="true"><label><input type="checkbox" checked><span></span></label><div><p>${text.trim()}</p></div></li>`;
     });
 
-    html = html.replace(/<li>(<p>)?\s*\[\s*\]\s*(.*?)<\/p><\/li>/gi, (match, pTag, text) => {
-      console.log('Found unchecked task item:', match);
+    html = html.replace(/<li>(?:<p>)?\s*\[\s*\]\s*(.*?)(?:<\/p>)?<\/li>/gi, (_match, text) => {
       return `<li data-type="taskItem" data-checked="false"><label><input type="checkbox"><span></span></label><div><p>${text.trim()}</p></div></li>`;
     });
 
     // Wrap task list items in ul with task-list class
     html = html.replace(/(<li data-type="taskItem".*?<\/li>\s*)+/gs, (match) => {
-      console.log('Wrapping task items in ul:', match);
       return `<ul data-type="taskList" class="task-list">${match}</ul>`;
     });
 
-    console.log('✨ Final HTML:', html);
     return html;
   } catch (error) {
-    console.error('Error parsing markdown:', error);
+    // Log error without exposing sensitive content
+    console.error('Error parsing markdown');
     return `<p>${markdown}</p>`;
   }
 }
@@ -187,9 +180,7 @@ export function TiptapEditor({ content, onChange, disabled = false, placeholder 
 
       // Convert HTML back to markdown
       const html = editor.getHTML();
-      console.log('📝 Converting HTML to Markdown:', html);
       const markdown = turndownService.turndown(html);
-      console.log('✅ Markdown result:', markdown);
       onChange(markdown);
     },
     editorProps: {
