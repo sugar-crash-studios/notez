@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { X, FileText, Loader2, Check } from 'lucide-react';
 import { tasksApi, foldersApi } from '../lib/api';
 import type { ExtractedTask } from '../types';
@@ -54,13 +54,14 @@ export default function TaskImportDialog({ onClose, onSuccess }: TaskImportDialo
       }
 
       const response = await tasksApi.scan(params);
-      setExtractedTasks(response.data.tasks);
+      const tasks = response.data.tasks;
+      const noteIds = new Set(tasks.map((task: ExtractedTask) => task.noteId));
 
-      // Select all notes by default
-      const noteIds = new Set(response.data.tasks.map((task: ExtractedTask) => task.noteId));
+      // Batch state updates together
+      setExtractedTasks(tasks);
       setSelectedNoteIds(noteIds);
 
-      if (response.data.tasks.length === 0) {
+      if (tasks.length === 0) {
         setError('No unchecked tasks found in notes.');
       }
     } catch (error: any) {
@@ -78,14 +79,11 @@ export default function TaskImportDialog({ onClose, onSuccess }: TaskImportDialo
     setError('');
 
     try {
-      const params: any = {
-        noteIds: Array.from(selectedNoteIds),
-      };
-      if (selectedFolderId) {
-        params.folderId = selectedFolderId;
-      }
+      // Filter tasks based on selected notes
+      const tasksToImport = extractedTasks.filter((task) => selectedNoteIds.has(task.noteId));
 
-      await tasksApi.import(params);
+      // Send the actual task data to the backend
+      await tasksApi.import({ tasks: tasksToImport });
       onSuccess();
       onClose();
     } catch (error: any) {
@@ -115,24 +113,29 @@ export default function TaskImportDialog({ onClose, onSuccess }: TaskImportDialo
     }
   };
 
-  // Group tasks by note
-  const groupedTasks: GroupedTasks[] = extractedTasks.reduce((acc, task) => {
-    const existingGroup = acc.find((g) => g.noteId === task.noteId);
-    if (existingGroup) {
-      existingGroup.tasks.push(task);
-    } else {
-      acc.push({
-        noteId: task.noteId,
-        noteTitle: task.noteTitle,
-        tasks: [task],
-      });
+  // Group tasks by note using Map for better performance
+  const groupedTasks: GroupedTasks[] = useMemo(() => {
+    const groups: Record<string, GroupedTasks> = {};
+    for (const task of extractedTasks) {
+      if (!groups[task.noteId]) {
+        groups[task.noteId] = {
+          noteId: task.noteId,
+          noteTitle: task.noteTitle,
+          tasks: [],
+        };
+      }
+      groups[task.noteId].tasks.push(task);
     }
-    return acc;
-  }, [] as GroupedTasks[]);
+    return Object.values(groups);
+  }, [extractedTasks]);
 
-  const selectedTaskCount = groupedTasks
-    .filter((group) => selectedNoteIds.has(group.noteId))
-    .reduce((sum, group) => sum + group.tasks.length, 0);
+  const selectedTaskCount = useMemo(
+    () =>
+      groupedTasks
+        .filter((group) => selectedNoteIds.has(group.noteId))
+        .reduce((sum, group) => sum + group.tasks.length, 0),
+    [groupedTasks, selectedNoteIds]
+  );
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 pb-20 xl:pb-4">

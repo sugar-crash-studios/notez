@@ -114,16 +114,10 @@ export async function tasksRoutes(fastify: FastifyInstance) {
         const userId = request.user!.userId;
         const body = request.body as ImportTasksInput;
 
-        // First, scan notes for tasks
-        const extractedTasks = await taskExtractionService.scanNotesForTasks(userId, {
-          folderId: body.folderId,
-          noteIds: body.noteIds,
-        });
-
-        // Then import them
+        // Import tasks directly (no need to re-scan)
         const importedTasks = await taskExtractionService.importTasksFromNotes(
           userId,
-          extractedTasks
+          body.tasks
         );
 
         return {

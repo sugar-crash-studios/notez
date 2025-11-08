@@ -150,8 +150,13 @@ export const listTasksQuerySchema = z.object({
 });
 
 export const importTasksSchema = z.object({
-  folderId: z.string().uuid('Invalid folder ID').optional(),
-  noteIds: z.array(z.string().uuid()).optional(),
+  tasks: z.array(z.object({
+    noteId: z.string().uuid('Invalid note ID'),
+    noteTitle: z.string(),
+    title: z.string().min(1).max(500),
+    checked: z.boolean(),
+    folderId: z.string().uuid('Invalid folder ID').nullable().optional(),
+  })),
 });
 
 // Tag schemas
