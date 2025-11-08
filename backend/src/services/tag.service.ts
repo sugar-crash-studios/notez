@@ -17,7 +17,7 @@ export async function listTags(userId: string) {
     },
   });
 
-  return tags.map((tag) => ({
+  return tags.map((tag: any) => ({
     id: tag.id,
     name: tag.name,
     noteCount: tag._count.notes,

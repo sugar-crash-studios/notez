@@ -44,7 +44,7 @@ export async function getTaskById(taskId: string, userId: string) {
   // Transform tags to simpler format
   return {
     ...task,
-    tags: task.tags.map((tt) => tt.tag),
+    tags: task.tags.map((tt: any) => tt.tag),
   };
 }
 
@@ -153,9 +153,9 @@ export async function listTasks(
   ]);
 
   // Transform tags to simpler format
-  const transformedTasks = tasks.map((task) => ({
+  const transformedTasks = tasks.map((task: any) => ({
     ...task,
-    tags: task.tags.map((tt) => tt.tag),
+    tags: task.tags.map((tt: any) => tt.tag),
   }));
 
   return {
@@ -170,7 +170,7 @@ export async function listTasks(
  * Create a new task
  */
 export async function createTask(userId: string, data: CreateTaskInput) {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: any) => {
     // If folderId is provided, verify it belongs to the user
     if (data.folderId) {
       const folder = await tx.folder.findFirst({
@@ -264,7 +264,7 @@ export async function createTask(userId: string, data: CreateTaskInput) {
     // Transform tags to simpler format
     return {
       ...task,
-      tags: task.tags.map((tt) => tt.tag),
+      tags: task.tags.map((tt: any) => tt.tag),
     };
   });
 }
@@ -273,7 +273,7 @@ export async function createTask(userId: string, data: CreateTaskInput) {
  * Update a task
  */
 export async function updateTask(taskId: string, userId: string, data: UpdateTaskInput) {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: any) => {
     // Verify task exists and belongs to user
     const existingTask = await tx.task.findFirst({
       where: {
@@ -404,7 +404,7 @@ export async function updateTask(taskId: string, userId: string, data: UpdateTas
     // Transform tags to simpler format
     return {
       ...task,
-      tags: task.tags.map((tt) => tt.tag),
+      tags: task.tags.map((tt: any) => tt.tag),
     };
   });
 }

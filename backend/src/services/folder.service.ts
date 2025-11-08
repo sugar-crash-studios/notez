@@ -47,7 +47,7 @@ export async function listFolders(userId: string) {
     },
   });
 
-  return folders.map((folder) => ({
+  return folders.map((folder: any) => ({
     ...folder,
     noteCount: folder._count.notes,
     _count: undefined,
@@ -58,7 +58,7 @@ export async function listFolders(userId: string) {
  * Create a new folder
  */
 export async function createFolder(userId: string, data: CreateFolderInput) {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: any) => {
     // Check if folder with same name already exists for this user
     const existing = await tx.folder.findFirst({
       where: {
@@ -96,7 +96,7 @@ export async function createFolder(userId: string, data: CreateFolderInput) {
  * Update a folder (rename)
  */
 export async function updateFolder(folderId: string, userId: string, data: UpdateFolderInput) {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: any) => {
     // Verify folder exists and belongs to user
     const existingFolder = await tx.folder.findFirst({
       where: {
@@ -150,7 +150,7 @@ export async function updateFolder(folderId: string, userId: string, data: Updat
  * Notes in the folder will become unfiled (folderId set to null) due to onDelete: SetNull
  */
 export async function deleteFolder(folderId: string, userId: string) {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: any) => {
     // Verify folder exists and belongs to user
     const folder = await tx.folder.findFirst({
       where: {
@@ -204,14 +204,14 @@ export async function getFolderStats(userId: string) {
   });
 
   const totalFolders = foldersWithCounts.length;
-  const emptyFolders = foldersWithCounts.filter((f) => f._count.notes === 0).length;
-  const totalNotes = foldersWithCounts.reduce((sum, f) => sum + f._count.notes, 0);
+  const emptyFolders = foldersWithCounts.filter((f: any) => f._count.notes === 0).length;
+  const totalNotes = foldersWithCounts.reduce((sum: any, f: any) => sum + f._count.notes, 0);
 
   return {
     totalFolders,
     emptyFolders,
     totalNotes,
-    folders: foldersWithCounts.map((f) => ({
+    folders: foldersWithCounts.map((f: any) => ({
       id: f.id,
       name: f.name,
       noteCount: f._count.notes,

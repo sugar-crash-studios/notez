@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { tasksApi, foldersApi } from '../lib/api';
 import type { Task, TaskStatus, TaskPriority } from '../types';
-import TagInput from './TagInput';
+import { TagInput } from './TagInput';
 
 interface TaskFormProps {
   task?: Task | null;
@@ -217,9 +217,8 @@ export default function TaskForm({ task, onClose, onSuccess }: TaskFormProps) {
               Tags
             </label>
             <TagInput
-              value={tags}
+              tags={tags.map((name, index) => ({ id: `temp-${index}`, name }))}
               onChange={setTags}
-              placeholder="Add tags..."
             />
           </div>
 

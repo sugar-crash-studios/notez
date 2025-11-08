@@ -38,7 +38,7 @@ export async function getNoteById(noteId: string, userId: string) {
   // Transform tags to simpler format
   return {
     ...note,
-    tags: note.tags.map((nt) => nt.tag),
+    tags: note.tags.map((nt: any) => nt.tag),
   };
 }
 
@@ -114,9 +114,9 @@ export async function listNotes(
   ]);
 
   // Transform tags to simpler format
-  const transformedNotes = notes.map((note) => ({
+  const transformedNotes = notes.map((note: any) => ({
     ...note,
-    tags: note.tags.map((nt) => nt.tag),
+    tags: note.tags.map((nt: any) => nt.tag),
   }));
 
   return {
@@ -131,7 +131,7 @@ export async function listNotes(
  * Create a new note
  */
 export async function createNote(userId: string, data: CreateNoteInput) {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: any) => {
     // If folderId is provided, verify it belongs to the user
     if (data.folderId) {
       const folder = await tx.folder.findFirst({
@@ -197,7 +197,7 @@ export async function createNote(userId: string, data: CreateNoteInput) {
     // Transform tags to simpler format
     return {
       ...note,
-      tags: note.tags.map((nt) => nt.tag),
+      tags: note.tags.map((nt: any) => nt.tag),
     };
   });
 }
@@ -206,7 +206,7 @@ export async function createNote(userId: string, data: CreateNoteInput) {
  * Update a note
  */
 export async function updateNote(noteId: string, userId: string, data: UpdateNoteInput) {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: any) => {
     // Verify note exists and belongs to user
     const existingNote = await tx.note.findFirst({
       where: {
@@ -292,7 +292,7 @@ export async function updateNote(noteId: string, userId: string, data: UpdateNot
     // Transform tags to simpler format
     return {
       ...note,
-      tags: note.tags.map((nt) => nt.tag),
+      tags: note.tags.map((nt: any) => nt.tag),
     };
   });
 }
@@ -368,9 +368,9 @@ export async function listDeletedNotes(
   ]);
 
   // Transform tags to simpler format
-  const transformedNotes = notes.map((note) => ({
+  const transformedNotes = notes.map((note: any) => ({
     ...note,
-    tags: note.tags.map((nt) => nt.tag),
+    tags: note.tags.map((nt: any) => nt.tag),
   }));
 
   return {
