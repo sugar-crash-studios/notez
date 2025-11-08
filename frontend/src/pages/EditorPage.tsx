@@ -123,11 +123,13 @@ export function EditorPage() {
             onSelectFolder={(folderId) => {
               setSelectedFolderId(folderId);
               setSelectedNoteId(null);
+              setSelectedView('notes'); // Switch to notes view when folder is selected
               setMobileView('list'); // Switch to list view on mobile after selecting folder
             }}
             onSelectTag={(tagId) => {
               setSelectedTagId(tagId);
               setSelectedNoteId(null);
+              setSelectedView('notes'); // Switch to notes view when tag is selected
               setMobileView('list'); // Switch to list view on mobile after selecting tag
             }}
             onSelectView={(view) => {

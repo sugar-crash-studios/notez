@@ -1,11 +1,16 @@
 /* Tiptap Editor Styles */
 .tiptap-wrapper {
   background: transparent;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .tiptap-editor {
   min-height: 100%;
   outline: none;
+  max-width: 100%;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 /* Prose styles for better readability */
@@ -51,6 +56,8 @@
 .tiptap-editor.prose p {
   margin-top: 0.75em;
   margin-bottom: 0.75em;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .tiptap-editor.prose strong {
@@ -75,12 +82,17 @@
   padding: 1em;
   overflow-x: auto;
   margin: 1em 0;
+  max-width: 100%;
+  word-wrap: break-word;
+  white-space: pre-wrap;
 }
 
 .tiptap-editor.prose pre code {
   background-color: transparent;
   padding: 0;
   font-size: 0.875em;
+  word-wrap: break-word;
+  white-space: pre-wrap;
 }
 
 .tiptap-editor.prose ul,
@@ -145,11 +157,15 @@
 .tiptap-editor ul.task-list li > div {
   flex: 1;
   min-width: 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .tiptap-editor ul.task-list li > div > p {
   margin: 0;
   line-height: 1.5em;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .tiptap-editor ul.task-list input[type="checkbox"] {
