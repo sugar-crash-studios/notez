@@ -1,6 +1,6 @@
 import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { foldersApi, tagsApi, notesApi } from '../lib/api';
-import { ChevronLeft, ChevronRight, Folder, FolderPlus, Tag, ChevronDown, ChevronUp, FileQuestion, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Folder, FolderPlus, Tag, ChevronDown, ChevronUp, FileQuestion, Trash2, CheckSquare } from 'lucide-react';
 import { EditableListItem } from './EditableListItem';
 
 interface FolderData {
@@ -20,8 +20,10 @@ interface TagData {
 interface FolderSidebarProps {
   selectedFolderId: string | null;
   selectedTagId: string | null;
+  selectedView: 'notes' | 'tasks';
   onSelectFolder: (folderId: string | null) => void;
   onSelectTag: (tagId: string | null) => void;
+  onSelectView: (view: 'notes' | 'tasks') => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
   onNoteMoved?: () => void;
@@ -36,8 +38,10 @@ export interface FolderSidebarHandle {
 export const FolderSidebar = forwardRef<FolderSidebarHandle, FolderSidebarProps>(({
   selectedFolderId,
   selectedTagId,
+  selectedView,
   onSelectFolder,
   onSelectTag,
+  onSelectView,
   collapsed,
   onToggleCollapse,
   onNoteMoved,
@@ -287,20 +291,33 @@ export const FolderSidebar = forwardRef<FolderSidebarHandle, FolderSidebarProps>
         {/* All Notes - Clear all filters */}
         <button
           onClick={() => {
+            onSelectView('notes');
             onSelectFolder(null);
             onSelectTag(null);
           }}
-          className={`w-full px-4 py-2.5 flex items-center space-x-3 hover:bg-gray-50 dark:bg-gray-700 ${
-            selectedFolderId === null && selectedTagId === null ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-600' : ''
+          className={`w-full px-4 py-2.5 flex items-center space-x-3 hover:bg-gray-50 dark:hover:bg-gray-700 ${
+            selectedView === 'notes' && selectedFolderId === null && selectedTagId === null ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-600' : ''
           }`}
         >
           <Folder className="w-5 h-5 text-gray-400 dark:text-gray-500" />
           <span className="text-sm font-medium text-gray-700 dark:text-gray-200">All Notes</span>
         </button>
 
+        {/* Tasks View */}
+        <button
+          onClick={() => onSelectView('tasks')}
+          className={`w-full px-4 py-2.5 flex items-center space-x-3 hover:bg-gray-50 dark:hover:bg-gray-700 ${
+            selectedView === 'tasks' ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-600' : ''
+          }`}
+        >
+          <CheckSquare className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Tasks</span>
+        </button>
+
         {/* Unfiled Notes */}
         <button
           onClick={() => {
+            onSelectView('notes');
             onSelectFolder('unfiled');
             onSelectTag(null);
           }}
@@ -356,6 +373,7 @@ export const FolderSidebar = forwardRef<FolderSidebarHandle, FolderSidebarProps>
         {/* Trash */}
         <button
           onClick={() => {
+            onSelectView('notes');
             onSelectFolder('trash');
             onSelectTag(null);
           }}

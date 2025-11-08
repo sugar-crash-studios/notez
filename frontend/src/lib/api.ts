@@ -203,3 +203,57 @@ export const searchApi = {
   search: (params: { q: string; folderId?: string; limit?: number; offset?: number }) =>
     api.get('/api/search', { params }),
 };
+
+export const tasksApi = {
+  list: (params?: {
+    status?: string | string[];
+    priority?: string;
+    folderId?: string;
+    noteId?: string;
+    tagId?: string;
+    overdue?: boolean;
+    limit?: number;
+    offset?: number;
+  }) => api.get('/api/tasks', { params }),
+
+  get: (id: string) => api.get(`/api/tasks/${id}`),
+
+  create: (data: {
+    title: string;
+    description?: string;
+    status?: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+    priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+    dueDate?: string;
+    noteId?: string;
+    folderId?: string;
+    tags?: string[];
+  }) => api.post('/api/tasks', data),
+
+  update: (
+    id: string,
+    data: {
+      title?: string;
+      description?: string;
+      status?: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+      priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+      dueDate?: string | null;
+      noteId?: string | null;
+      folderId?: string | null;
+      tags?: string[];
+    }
+  ) => api.put(`/api/tasks/${id}`, data),
+
+  updateStatus: (id: string, status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED') =>
+    api.patch(`/api/tasks/${id}/status`, { status }),
+
+  delete: (id: string) => api.delete(`/api/tasks/${id}`),
+
+  stats: () => api.get('/api/tasks/stats'),
+
+  // Task import operations
+  scan: (data?: { folderId?: string; noteIds?: string[] }) =>
+    api.post('/api/tasks/scan', data || {}),
+
+  import: (data?: { folderId?: string; noteIds?: string[] }) =>
+    api.post('/api/tasks/import', data || {}),
+};

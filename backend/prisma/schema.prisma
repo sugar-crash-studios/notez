@@ -32,6 +32,7 @@ model User {
   folders    Folder[]
   notes      Note[]
   tags       Tag[]
+  tasks      Task[]
   aiSettings UserAISettings?
 
   @@map("users")
@@ -62,6 +63,7 @@ model Folder {
   // Relations
   user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   notes Note[]
+  tasks Task[]
 
   @@unique([userId, name])
   @@map("folders")
@@ -84,6 +86,7 @@ model Note {
   user   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   folder Folder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
   tags   NoteTag[]
+  tasks  Task[]
 
   @@index([searchVector], type: Gin)
   @@map("notes")
@@ -97,8 +100,9 @@ model Tag {
   createdAt DateTime @default(now()) @map("created_at")
 
   // Relations
-  user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  notes NoteTag[]
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notes     NoteTag[]
+  taskTags  TaskTag[]
 
   @@unique([userId, name])
   @@map("tags")
@@ -115,6 +119,69 @@ model NoteTag {
 
   @@id([noteId, tagId])
   @@map("note_tags")
+}
+
+// Tasks (standalone or linked to notes)
+model Task {
+  id          String      @id @default(uuid())
+  userId      String      @map("user_id")
+  title       String      @db.VarChar(500)
+  description String?     @db.Text
+  status      TaskStatus  @default(PENDING)
+  priority    Priority    @default(MEDIUM)
+  dueDate     DateTime?   @map("due_date")
+
+  // Note linkback (null for standalone tasks)
+  noteId      String?     @map("note_id")
+  noteTitle   String?     @map("note_title") @db.VarChar(500)
+
+  // Organization
+  folderId    String?     @map("folder_id")
+
+  // Timestamps
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  completedAt DateTime?   @map("completed_at")
+
+  // Relations
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  note        Note?       @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  folder      Folder?     @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  tags        TaskTag[]
+
+  @@index([userId, status])
+  @@index([userId, dueDate])
+  @@index([noteId])
+  @@map("tasks")
+}
+
+// Task-Tag junction table
+model TaskTag {
+  taskId String @map("task_id")
+  tagId  String @map("tag_id")
+
+  // Relations
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, tagId])
+  @@map("task_tags")
+}
+
+// Task status enum
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+// Task priority enum
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
 }
 
 // System settings (key-value store)

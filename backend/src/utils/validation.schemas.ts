@@ -108,6 +108,52 @@ export const aiSuggestTagsSchema = z.object({
   maxTags: z.number().int().min(1).max(20).default(5).optional(),
 });
 
+// Task schemas
+export const createTaskSchema = z.object({
+  title: z.string().min(1, 'Title is required').max(500, 'Title must not exceed 500 characters'),
+  description: z.string().optional(),
+  status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']).default('PENDING').optional(),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).default('MEDIUM').optional(),
+  dueDate: z.string().datetime().optional(),
+  noteId: z.string().uuid('Invalid note ID').optional(),
+  folderId: z.string().uuid('Invalid folder ID').optional(),
+  tags: z.array(z.string().min(1).max(100)).optional(),
+});
+
+export const updateTaskSchema = z.object({
+  title: z.string().min(1, 'Title is required').max(500, 'Title must not exceed 500 characters').optional(),
+  description: z.string().optional(),
+  status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']).optional(),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
+  dueDate: z.string().datetime().nullable().optional(),
+  noteId: z.string().uuid('Invalid note ID').nullable().optional(),
+  folderId: z.string().uuid('Invalid folder ID').nullable().optional(),
+  tags: z.array(z.string().min(1).max(100)).optional(),
+});
+
+export const updateTaskStatusSchema = z.object({
+  status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']),
+});
+
+export const listTasksQuerySchema = z.object({
+  status: z.union([
+    z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']),
+    z.array(z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'])),
+  ]).optional(),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
+  folderId: z.string().uuid('Invalid folder ID').optional(),
+  noteId: z.string().uuid('Invalid note ID').optional(),
+  tagId: z.string().uuid('Invalid tag ID').optional(),
+  overdue: z.coerce.boolean().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export const importTasksSchema = z.object({
+  folderId: z.string().uuid('Invalid folder ID').optional(),
+  noteIds: z.array(z.string().uuid()).optional(),
+});
+
 // Tag schemas
 export const renameTagSchema = z.object({
   name: z.string().min(1, 'Tag name is required').max(100, 'Tag name must not exceed 100 characters'),
@@ -143,5 +189,10 @@ export type AIConfigInput = z.infer<typeof aiConfigSchema>;
 export type AISummarizeInput = z.infer<typeof aiSummarizeSchema>;
 export type AISuggestTitleInput = z.infer<typeof aiSuggestTitleSchema>;
 export type AISuggestTagsInput = z.infer<typeof aiSuggestTagsSchema>;
+export type CreateTaskInput = z.infer<typeof createTaskSchema>;
+export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
+export type UpdateTaskStatusInput = z.infer<typeof updateTaskStatusSchema>;
+export type ListTasksQuery = z.infer<typeof listTasksQuerySchema>;
+export type ImportTasksInput = z.infer<typeof importTasksSchema>;
 export type RenameTagInput = z.infer<typeof renameTagSchema>;
 export type TagSearchQuery = z.infer<typeof tagSearchQuerySchema>;

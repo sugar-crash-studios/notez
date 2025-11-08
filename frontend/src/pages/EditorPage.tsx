@@ -3,15 +3,17 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FolderSidebar, type FolderSidebarHandle } from '../components/FolderSidebar';
 import { NoteList, type NoteListHandle } from '../components/NoteList';
 import { NoteEditor } from '../components/NoteEditor';
+import TaskList from '../components/TaskList';
 import { SearchBar } from '../components/SearchBar';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { useAuth } from '../contexts/AuthContext';
-import { Settings, Menu, FileText, Edit3 } from 'lucide-react';
+import { Settings, Menu, FileText, Edit3, CheckSquare } from 'lucide-react';
 
 export function EditorPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedView, setSelectedView] = useState<'notes' | 'tasks'>('notes');
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
@@ -25,6 +27,7 @@ export function EditorPage() {
     const noteId = searchParams.get('note');
     if (noteId) {
       setSelectedNoteId(noteId);
+      setSelectedView('notes');
       setMobileView('editor'); // Switch to editor on mobile when note is selected
       // Clear the query parameter after setting the note
       setSearchParams({});
@@ -33,10 +36,10 @@ export function EditorPage() {
 
   // Auto-switch to editor view on mobile when a note is selected
   useEffect(() => {
-    if (selectedNoteId) {
+    if (selectedNoteId && selectedView === 'notes') {
       setMobileView('editor');
     }
-  }, [selectedNoteId]);
+  }, [selectedNoteId, selectedView]);
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -62,6 +65,12 @@ export function EditorPage() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  const handleNoteClick = (noteId: string) => {
+    setSelectedView('notes');
+    setSelectedNoteId(noteId);
+    setMobileView('editor');
+  };
 
   return (
     <div className="h-screen flex flex-col bg-gray-100 dark:bg-gray-900">
@@ -110,6 +119,7 @@ export function EditorPage() {
             ref={sidebarRef}
             selectedFolderId={selectedFolderId}
             selectedTagId={selectedTagId}
+            selectedView={selectedView}
             onSelectFolder={(folderId) => {
               setSelectedFolderId(folderId);
               setSelectedNoteId(null);
@@ -120,6 +130,11 @@ export function EditorPage() {
               setSelectedNoteId(null);
               setMobileView('list'); // Switch to list view on mobile after selecting tag
             }}
+            onSelectView={(view) => {
+              setSelectedView(view);
+              setSelectedNoteId(null);
+              setMobileView('list'); // Switch to list view on mobile after selecting view
+            }}
             collapsed={sidebarCollapsed}
             onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
             onNoteMoved={() => {
@@ -129,45 +144,51 @@ export function EditorPage() {
           />
         </div>
 
-        {/* Note List - Hidden on mobile unless mobileView === 'list' */}
+        {/* Note List or Task List - Hidden on mobile unless mobileView === 'list' */}
         <div className={`${mobileView === 'list' ? 'block' : 'hidden'} xl:block`}>
-          <NoteList
-            ref={noteListRef}
-            folderId={selectedFolderId}
-            tagId={selectedTagId}
-            selectedNoteId={selectedNoteId}
-            onSelectNote={setSelectedNoteId}
-            onNoteCreated={() => {
-              // Refresh sidebar counts after note creation
-              sidebarRef.current?.refreshFolders();
-            }}
-          />
+          {selectedView === 'notes' ? (
+            <NoteList
+              ref={noteListRef}
+              folderId={selectedFolderId}
+              tagId={selectedTagId}
+              selectedNoteId={selectedNoteId}
+              onSelectNote={setSelectedNoteId}
+              onNoteCreated={() => {
+                // Refresh sidebar counts after note creation
+                sidebarRef.current?.refreshFolders();
+              }}
+            />
+          ) : (
+            <TaskList onNoteClick={handleNoteClick} />
+          )}
         </div>
 
         {/* Note Editor - Hidden on mobile unless mobileView === 'editor' */}
-        <div className={`flex-1 flex-col min-h-0 ${mobileView === 'editor' ? 'flex' : 'hidden'} xl:flex`}>
-          <NoteEditor
-            noteId={selectedNoteId}
-            onNoteDeleted={(noteId) => {
-              setSelectedNoteId(null);
-              setMobileView('list'); // Return to list view on mobile after deleting
-              noteListRef.current?.removeNote(noteId);
-              sidebarRef.current?.refreshAll();
-            }}
-            onTagsChanged={() => {
-              sidebarRef.current?.refreshTags();
-            }}
-            onNoteUpdated={(noteId, updates) => {
-              noteListRef.current?.updateNote(noteId, updates);
-            }}
-            onNoteRestored={(noteId) => {
-              setSelectedNoteId(null);
-              setMobileView('list'); // Return to list view on mobile after restoring
-              noteListRef.current?.removeNote(noteId); // Remove from trash list
-              sidebarRef.current?.refreshAll(); // Refresh counts
-            }}
-          />
-        </div>
+        {selectedView === 'notes' && (
+          <div className={`flex-1 flex-col min-h-0 ${mobileView === 'editor' ? 'flex' : 'hidden'} xl:flex`}>
+            <NoteEditor
+              noteId={selectedNoteId}
+              onNoteDeleted={(noteId) => {
+                setSelectedNoteId(null);
+                setMobileView('list'); // Return to list view on mobile after deleting
+                noteListRef.current?.removeNote(noteId);
+                sidebarRef.current?.refreshAll();
+              }}
+              onTagsChanged={() => {
+                sidebarRef.current?.refreshTags();
+              }}
+              onNoteUpdated={(noteId, updates) => {
+                noteListRef.current?.updateNote(noteId, updates);
+              }}
+              onNoteRestored={(noteId) => {
+                setSelectedNoteId(null);
+                setMobileView('list'); // Return to list view on mobile after restoring
+                noteListRef.current?.removeNote(noteId); // Remove from trash list
+                sidebarRef.current?.refreshAll(); // Refresh counts
+              }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Mobile Bottom Navigation - Only visible on small screens */}
@@ -184,9 +205,12 @@ export function EditorPage() {
           <span className="text-xs mt-1">Folders</span>
         </button>
         <button
-          onClick={() => setMobileView('list')}
+          onClick={() => {
+            setMobileView('list');
+            setSelectedView('notes');
+          }}
           className={`flex flex-col items-center px-4 py-2 rounded-md ${
-            mobileView === 'list'
+            mobileView === 'list' && selectedView === 'notes'
               ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'
               : 'text-gray-600 dark:text-gray-400'
           }`}
@@ -195,13 +219,27 @@ export function EditorPage() {
           <span className="text-xs mt-1">Notes</span>
         </button>
         <button
+          onClick={() => {
+            setMobileView('list');
+            setSelectedView('tasks');
+          }}
+          className={`flex flex-col items-center px-4 py-2 rounded-md ${
+            mobileView === 'list' && selectedView === 'tasks'
+              ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'
+              : 'text-gray-600 dark:text-gray-400'
+          }`}
+        >
+          <CheckSquare className="w-5 h-5" />
+          <span className="text-xs mt-1">Tasks</span>
+        </button>
+        <button
           onClick={() => setMobileView('editor')}
           className={`flex flex-col items-center px-4 py-2 rounded-md ${
             mobileView === 'editor'
               ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'
               : 'text-gray-600 dark:text-gray-400'
           }`}
-          disabled={!selectedNoteId}
+          disabled={!selectedNoteId || selectedView !== 'notes'}
         >
           <Edit3 className="w-5 h-5" />
           <span className="text-xs mt-1">Editor</span>
