@@ -9,10 +9,12 @@ import {
   updateTaskSchema,
   updateTaskStatusSchema,
   listTasksQuerySchema,
+  scanTasksSchema,
   importTasksSchema,
   type CreateTaskInput,
   type UpdateTaskInput,
   type UpdateTaskStatusInput,
+  type ScanTasksInput,
   type ImportTasksInput,
 } from '../utils/validation.schemas.js';
 
@@ -77,12 +79,12 @@ export async function tasksRoutes(fastify: FastifyInstance) {
   fastify.post(
     '/tasks/scan',
     {
-      preHandler: validateBody(importTasksSchema),
+      preHandler: validateBody(scanTasksSchema),
     },
     async (request, reply) => {
       try {
         const userId = request.user!.userId;
-        const body = request.body as ImportTasksInput;
+        const body = request.body as ScanTasksInput;
 
         const extractedTasks = await taskExtractionService.scanNotesForTasks(userId, {
           folderId: body.folderId,

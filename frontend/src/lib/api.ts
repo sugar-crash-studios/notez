@@ -254,6 +254,12 @@ export const tasksApi = {
   scan: (data?: { folderId?: string; noteIds?: string[] }) =>
     api.post('/api/tasks/scan', data || {}),
 
-  import: (data?: { folderId?: string; noteIds?: string[] }) =>
-    api.post('/api/tasks/import', data || {}),
+  import: (data: { tasks: Array<{
+    noteId: string;
+    noteTitle: string;
+    title: string;
+    checked: boolean;
+    folderId?: string | null;
+  }> }) =>
+    api.post('/api/tasks/import', data),
 };

@@ -149,6 +149,11 @@ export const listTasksQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
+export const scanTasksSchema = z.object({
+  folderId: z.string().uuid('Invalid folder ID').optional(),
+  noteIds: z.array(z.string().uuid()).optional(),
+});
+
 export const importTasksSchema = z.object({
   tasks: z.array(z.object({
     noteId: z.string().uuid('Invalid note ID'),
@@ -198,6 +203,7 @@ export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 export type UpdateTaskStatusInput = z.infer<typeof updateTaskStatusSchema>;
 export type ListTasksQuery = z.infer<typeof listTasksQuerySchema>;
+export type ScanTasksInput = z.infer<typeof scanTasksSchema>;
 export type ImportTasksInput = z.infer<typeof importTasksSchema>;
 export type RenameTagInput = z.infer<typeof renameTagSchema>;
 export type TagSearchQuery = z.infer<typeof tagSearchQuerySchema>;
