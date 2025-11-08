@@ -45,7 +45,7 @@ export default function TaskImportDialog({ onClose, onSuccess }: TaskImportDialo
     setIsScanning(true);
     setError('');
     setExtractedTasks([]);
-    setSelectedNoteIds(new Set());
+    setSelectedNoteIds(new Set<string>());
 
     try {
       const params: any = {};
@@ -55,7 +55,7 @@ export default function TaskImportDialog({ onClose, onSuccess }: TaskImportDialo
 
       const response = await tasksApi.scan(params);
       const tasks = response.data.tasks;
-      const noteIds = new Set(tasks.map((task: ExtractedTask) => task.noteId));
+      const noteIds = new Set<string>(tasks.map((task: ExtractedTask) => task.noteId));
 
       // Batch state updates together
       setExtractedTasks(tasks);
@@ -106,9 +106,9 @@ export default function TaskImportDialog({ onClose, onSuccess }: TaskImportDialo
 
   const toggleSelectAll = () => {
     if (selectedNoteIds.size === groupedTasks.length) {
-      setSelectedNoteIds(new Set());
+      setSelectedNoteIds(new Set<string>());
     } else {
-      const allNoteIds = new Set(groupedTasks.map((group) => group.noteId));
+      const allNoteIds = new Set<string>(groupedTasks.map((group) => group.noteId));
       setSelectedNoteIds(allNoteIds);
     }
   };
@@ -221,7 +221,7 @@ export default function TaskImportDialog({ onClose, onSuccess }: TaskImportDialo
                   <button
                     onClick={() => {
                       setExtractedTasks([]);
-                      setSelectedNoteIds(new Set());
+                      setSelectedNoteIds(new Set<string>());
                     }}
                     className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                   >
@@ -288,7 +288,7 @@ export default function TaskImportDialog({ onClose, onSuccess }: TaskImportDialo
                 <button
                   onClick={() => {
                     setExtractedTasks([]);
-                    setSelectedNoteIds(new Set());
+                    setSelectedNoteIds(new Set<string>());
                   }}
                   className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
                 >
