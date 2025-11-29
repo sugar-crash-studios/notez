@@ -100,27 +100,92 @@ All passwords must meet these criteria:
 
 ### Writing Notes
 
-Notez uses the powerful **Monaco Editor** (the same editor that powers VS Code):
+Notez offers **two editor modes** to suit your preference:
+
+#### Formatted Mode (Default - TipTap Editor)
+
+The default **Formatted** mode uses TipTap, a rich-text editor that renders your markdown in real-time:
 
 1. **Title Field**: Enter your note title at the top
-2. **Content Area**: Write your note content below
-3. **Formatting**: Use plain text or Markdown syntax
-   - Headers: `# Heading 1`, `## Heading 2`
-   - Lists: `- Item` or `1. Item`
-   - Bold: `**text**`
-   - Italic: `*text*`
-   - Code: `` `code` `` or ` ```language ```  `
-4. **Syntax Highlighting**: Supports 50+ programming languages
+2. **Content Area**: Write freely - formatting appears as you type
+3. **Live Formatting**: Markdown is rendered immediately
+   - Type `# Heading` and see it become a heading
+   - Type `**bold**` and see bold text
+   - Type `- item` for bullet lists
+   - Type `- [ ] task` for checkboxes/tasks
 
-#### Editor Features
+**Formatted Mode Features:**
+- WYSIWYG editing (What You See Is What You Get)
+- Click checkboxes to toggle task completion
+- Clean, distraction-free writing experience
+- Full markdown support rendered live
 
-- **Line Numbers**: Displayed on the left
-- **Minimap**: Visual overview on the right edge
-- **Code Folding**: Collapse sections of text
-- **Auto-Indentation**: Smart indenting for code
-- **Bracket Matching**: Highlights matching brackets/parentheses
-- **Word Count**: Live count displayed in the editor footer
+#### Raw Mode (Monaco Editor)
+
+Click the **Raw** button to switch to Monaco Editor (the same editor that powers VS Code):
+
+1. See and edit raw markdown syntax directly
+2. **Syntax Highlighting**: Markdown structure highlighted
+3. Great for power users who prefer raw markdown
+
+**Raw Mode Features:**
+
+- Line numbers displayed on the left
+- Minimap visual overview on the right
+- Code folding for long documents
+- Auto-indentation
+- Bracket matching
+
+#### Editor Toggle
+
+- Click **Raw** to switch to raw markdown mode
+- Click **Formatted** to return to rich-text mode
+- Your content is preserved when switching
+
+#### Common Features (Both Modes)
+
+- **Word Count**: Live count displayed in the footer
 - **Character Count**: Total characters tracked in real-time
+- **Auto-Save**: Notes save automatically every 2 seconds
+
+### Markdown Reference
+
+Notez supports full GitHub-Flavored Markdown (GFM):
+
+| Syntax | Result |
+|--------|--------|
+| `# Heading 1` | Large heading |
+| `## Heading 2` | Medium heading |
+| `### Heading 3` | Small heading |
+| `**bold**` | **bold text** |
+| `*italic*` | *italic text* |
+| `~~strikethrough~~` | ~~crossed out~~ |
+| `` `code` `` | `inline code` |
+| `- item` | Bullet list |
+| `1. item` | Numbered list |
+| `- [ ] task` | Unchecked task |
+| `- [x] done` | Checked task |
+| `> quote` | Block quote |
+| `[link](url)` | Clickable link |
+| `---` | Horizontal rule |
+
+**Code Blocks:**
+
+````markdown
+```javascript
+const hello = "world";
+```
+````
+
+**Keyboard Shortcuts in Editor:**
+
+- `Ctrl+B` / `Cmd+B` - Bold
+- `Ctrl+I` / `Cmd+I` - Italic
+- `Ctrl+Z` / `Cmd+Z` - Undo
+- `Ctrl+Y` / `Cmd+Shift+Z` - Redo
+- `Ctrl+S` / `Cmd+S` - Save note
+
+Click the **?** (help) icon in the editor header for a quick reference.
 
 ### Saving Notes
 
@@ -855,6 +920,28 @@ Notez is fully responsive and optimized for mobile devices.
 - Provide more content context
 - Try a different model
 - Some models work better for certain tasks
+
+### Editor Issues
+
+**Problem:** Can't scroll in long notes
+
+- Ensure you're clicking inside the editor content area
+- Try scrolling with the scroll bar on the right side
+- Switch to Raw mode temporarily if issues persist
+- Refresh the page to reset editor state
+
+**Problem:** Formatting not applying (Ctrl+B, Ctrl+I, etc.)
+
+- Make sure text is selected before applying formatting
+- Click inside the editor to ensure it has focus
+- Try using markdown syntax directly (e.g., `**bold**`)
+- Switch between Formatted and Raw mode to reset editor state
+
+**Problem:** Content looks different after save
+
+- This can happen with complex nested formatting
+- Use simpler markdown structures when possible
+- Check the Raw view to see actual markdown stored
 
 ### Performance Issues
 

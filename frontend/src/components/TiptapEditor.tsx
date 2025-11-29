@@ -185,7 +185,18 @@ export function TiptapEditor({ content, onChange, disabled = false, placeholder 
     },
     editorProps: {
       attributes: {
-        class: 'tiptap-editor prose prose-sm dark:prose-invert max-w-none focus:outline-none min-h-full px-4 py-3',
+        class: 'tiptap-editor prose prose-sm dark:prose-invert max-w-none min-h-full px-4 py-3',
+      },
+      // Ensure formatting commands work reliably by handling keydown at the editor level
+      handleKeyDown: (_view, event) => {
+        // Don't prevent default browser behavior for keyboard shortcuts
+        // TipTap handles Ctrl+B, Ctrl+I, etc. natively via StarterKit
+        // This ensures the event properly reaches TipTap's handlers
+        if ((event.ctrlKey || event.metaKey) && ['b', 'i', 'u'].includes(event.key.toLowerCase())) {
+          // Let TipTap handle these formatting shortcuts
+          return false;
+        }
+        return false;
       },
     },
   });
@@ -196,13 +207,18 @@ export function TiptapEditor({ content, onChange, disabled = false, placeholder 
       const html = editor.getHTML();
       const currentMarkdown = turndownService.turndown(html);
 
+      // Normalize both for comparison (trim whitespace, normalize line endings)
+      const normalizedCurrent = currentMarkdown.trim().replace(/\r\n/g, '\n');
+      const normalizedNew = content.trim().replace(/\r\n/g, '\n');
+
       // Only update if content actually changed
-      if (currentMarkdown !== content) {
+      if (normalizedCurrent !== normalizedNew) {
         isUpdatingFromProp.current = true;
         editor.commands.setContent(markdownToHTML(content));
+        // Longer timeout to ensure editor state is fully settled
         setTimeout(() => {
           isUpdatingFromProp.current = false;
-        }, 100);
+        }, 150);
       }
     }
   }, [content, editor]);
@@ -219,8 +235,8 @@ export function TiptapEditor({ content, onChange, disabled = false, placeholder 
   }
 
   return (
-    <div className="tiptap-wrapper h-full overflow-y-auto">
-      <EditorContent editor={editor} />
+    <div className="tiptap-wrapper">
+      <EditorContent editor={editor} className="h-full" />
     </div>
   );
 }

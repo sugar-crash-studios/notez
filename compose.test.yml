@@ -1,0 +1,59 @@
+# Docker Compose for QA Testing
+# Spins up a completely isolated test environment with fresh database
+# Usage: docker compose -f compose.test.yml up --build
+
+services:
+  # PostgreSQL Database - Fresh instance for testing
+  test-postgres:
+    image: postgres:16-alpine
+    container_name: notez-test-db
+    environment:
+      POSTGRES_DB: notez_test
+      POSTGRES_USER: notez
+      POSTGRES_PASSWORD: notez_test_password
+    # No volume - fresh database each time
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U notez -d notez_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Notez Application for Testing
+  notez-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: notez-test-app
+    depends_on:
+      test-postgres:
+        condition: service_healthy
+    environment:
+      # Database - connects to test postgres
+      DATABASE_URL: postgresql://notez:notez_test_password@test-postgres:5432/notez_test
+
+      # Server
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      LOG_LEVEL: debug
+
+      # CORS - allow from test browser
+      CORS_ORIGIN: "*"
+
+      # JWT Secrets for testing
+      JWT_ACCESS_SECRET: test-jwt-access-secret-for-qa-testing-only
+      JWT_REFRESH_SECRET: test-jwt-refresh-secret-for-qa-testing-only
+      COOKIE_SECRET: test-cookie-secret-for-qa-testing-only
+
+      # Encryption Key for AI API keys
+      ENCRYPTION_KEY: test-encryption-key-32-chars-min!
+    ports:
+      - "3001:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 10s
+      timeout: 5s
+      start_period: 60s
+      retries: 10

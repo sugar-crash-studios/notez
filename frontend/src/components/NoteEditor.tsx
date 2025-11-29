@@ -527,7 +527,7 @@ export function NoteEditor({ noteId, onNoteDeleted, onTagsChanged, onNoteUpdated
       </div>
 
       {/* Editor (Tiptap or Monaco) */}
-      <div className="flex-1 min-h-0 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-auto">
         {editorMode === 'formatted' ? (
           <TiptapEditor
             key="formatted-editor"

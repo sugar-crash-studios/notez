@@ -124,6 +124,13 @@ You have extensive autonomous permissions to:
 - Suggest improvements when you see opportunities
 - Flag potential issues or risks early
 
+## Environment Notes (Windows)
+
+- Use `ls` instead of `dir` for listing files (Git Bash compatibility)
+- Use absolute paths when possible to avoid directory confusion
+- **NEVER chain commands with `&&`** - this triggers permission prompts. Run commands separately one at a time.
+- Use forward slashes in paths (works in both PowerShell and Git Bash)
+
 ## References
 
 - MVP Specification: `/docs/mvp-specification.md`

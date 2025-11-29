@@ -29,12 +29,17 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+.cursor/
 *.swp
 *.swo
 *~
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Temporary/generated documentation (keep brownfield docs, exclude session artifacts)
+docs/project-scan-report.json
+docs/bmm-workflow-status.yaml
 
 # Docker
 *.pid
@@ -52,3 +57,7 @@ Thumbs.db
 .tmp/
 temp/
 docs/session-summary-2025-11-02.md
+
+# Root-level MCP/tool artifacts (not part of monorepo)
+/package.json
+/package-lock.json

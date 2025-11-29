@@ -3,14 +3,41 @@
   background: transparent;
   max-width: 100%;
   overflow-x: hidden;
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* ProseMirror container needs proper height to enable scrolling */
+.tiptap-wrapper .ProseMirror {
+  min-height: 100%;
+  height: auto;
+}
+
+/* Focus styles for accessibility - subtle inner glow instead of outline */
+.tiptap-wrapper .ProseMirror:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+.dark .tiptap-wrapper .ProseMirror:focus {
+  box-shadow: inset 0 0 0 2px rgba(96, 165, 250, 0.3);
 }
 
 .tiptap-editor {
   min-height: 100%;
-  outline: none;
   max-width: 100%;
   word-wrap: break-word;
   overflow-wrap: break-word;
+}
+
+/* Focus indicator for .tiptap-editor (applied via Tailwind focus:outline-none in component) */
+.tiptap-editor:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+.dark .tiptap-editor:focus {
+  box-shadow: inset 0 0 0 2px rgba(96, 165, 250, 0.3);
 }
 
 /* Prose styles for better readability */
