@@ -57,6 +57,7 @@ model Folder {
   id        String   @id @default(uuid())
   userId    String   @map("user_id")
   name      String   @db.VarChar(255)
+  icon      String   @default("folder") @db.VarChar(50) // Lucide icon name
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

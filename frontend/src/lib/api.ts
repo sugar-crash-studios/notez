@@ -128,9 +128,9 @@ export const foldersApi = {
 
   get: (id: string) => api.get(`/api/folders/${id}`),
 
-  create: (data: { name: string }) => api.post('/api/folders', data),
+  create: (data: { name: string; icon?: string }) => api.post('/api/folders', data),
 
-  update: (id: string, data: { name: string }) => api.patch(`/api/folders/${id}`, data),
+  update: (id: string, data: { name?: string; icon?: string }) => api.patch(`/api/folders/${id}`, data),
 
   delete: (id: string) => api.delete(`/api/folders/${id}`),
 

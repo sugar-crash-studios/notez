@@ -13,6 +13,8 @@ interface EditableListItemProps {
   className?: string;
   indent?: boolean;
   onDrop?: (id: string, noteId: string) => void;
+  // For folder icon editing - render function that receives editing state
+  renderIcon?: (isEditing: boolean) => React.ReactNode;
 }
 
 export function EditableListItem({
@@ -27,6 +29,7 @@ export function EditableListItem({
   className = '',
   indent = false,
   onDrop,
+  renderIcon,
 }: EditableListItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editingName, setEditingName] = useState('');
@@ -113,39 +116,43 @@ export function EditableListItem({
     >
       {isEditing ? (
         // Edit mode
-        <div className="flex items-center space-x-2 flex-1">
-          {icon && <div className="flex-shrink-0">{icon}</div>}
-          <input
-            type="text"
-            value={editingName}
-            onChange={(e) => setEditingName(e.target.value)}
-            className="flex-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleSave();
-              if (e.key === 'Escape') handleCancelEdit();
-            }}
-          />
-          <button
-            onClick={handleSave}
-            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
-            title="Save"
-          >
-            <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
-          </button>
-          <button
-            onClick={handleCancelEdit}
-            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
-            title="Cancel"
-          >
-            <X className="w-4 h-4 text-red-600 dark:text-red-400" />
-          </button>
+        <div className="flex-1 space-y-2">
+          <div className="flex items-center space-x-2">
+            {renderIcon ? renderIcon(true) : icon && <div className="flex-shrink-0">{icon}</div>}
+            <input
+              type="text"
+              value={editingName}
+              onChange={(e) => setEditingName(e.target.value)}
+              className="flex-1 min-w-0 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSave();
+                if (e.key === 'Escape') handleCancelEdit();
+              }}
+            />
+          </div>
+          <div className="flex justify-end space-x-1">
+            <button
+              onClick={handleCancelEdit}
+              className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+              title="Cancel"
+            >
+              <X className="w-4 h-4 text-red-600 dark:text-red-400" />
+            </button>
+            <button
+              onClick={handleSave}
+              className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+              title="Save"
+            >
+              <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+            </button>
+          </div>
         </div>
       ) : (
         // View mode
         <>
           <button onClick={onSelect} className={`flex items-center space-x-3 flex-1 ${indent ? '' : ''}`}>
-            {icon && <div className="flex-shrink-0">{icon}</div>}
+            {renderIcon ? renderIcon(false) : icon && <div className="flex-shrink-0">{icon}</div>}
             <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{name}</span>
           </button>
           <div className="flex items-center space-x-1">

@@ -75,6 +75,7 @@ export async function createFolder(userId: string, data: CreateFolderInput) {
     const folder = await tx.folder.create({
       data: {
         name: data.name,
+        icon: data.icon || 'folder',
         userId,
       },
       include: {
@@ -128,7 +129,8 @@ export async function updateFolder(folderId: string, userId: string, data: Updat
     const folder = await tx.folder.update({
       where: { id: folderId },
       data: {
-        name: data.name,
+        ...(data.name && { name: data.name }),
+        ...(data.icon && { icon: data.icon }),
       },
       include: {
         _count: {
@@ -194,6 +196,7 @@ export async function getFolderStats(userId: string) {
     select: {
       id: true,
       name: true,
+      icon: true,
       _count: {
         select: { notes: true },
       },
@@ -214,6 +217,7 @@ export async function getFolderStats(userId: string) {
     folders: foldersWithCounts.map((f: any) => ({
       id: f.id,
       name: f.name,
+      icon: f.icon,
       noteCount: f._count.notes,
     })),
   };

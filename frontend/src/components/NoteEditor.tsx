@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Editor from '@monaco-editor/react';
 import { notesApi, aiApi, foldersApi } from '../lib/api';
-import { Save, Trash2, Sparkles, FileText as FileTextIcon, Tags, RotateCcw, Folder, Eye, Code, HelpCircle } from 'lucide-react';
+import { Save, Trash2, Sparkles, FileText as FileTextIcon, Tags, RotateCcw, Folder, Eye, Code, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { TagInput } from './TagInput';
 import { TiptapEditor } from './TiptapEditor';
 import { MarkdownHelp } from './MarkdownHelp';
@@ -43,6 +43,7 @@ export function NoteEditor({ noteId, onNoteDeleted, onTagsChanged, onNoteUpdated
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [editorMode, setEditorMode] = useState<EditorMode>('formatted');
   const [showMarkdownHelp, setShowMarkdownHelp] = useState(false);
+  const [showAiActions, setShowAiActions] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -338,51 +339,62 @@ export function NoteEditor({ noteId, onNoteDeleted, onTagsChanged, onNoteUpdated
         </div>
       )}
 
-      {/* Editor Header */}
-      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 space-y-3">
-        <div className="flex items-center justify-between">
+      {/* Editor Header - Compact on mobile */}
+      <div className="px-3 sm:px-6 py-2 sm:py-4 border-b border-gray-200 dark:border-gray-700 space-y-2 sm:space-y-3">
+        {/* Title Row */}
+        <div className="flex items-center justify-between gap-2">
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             disabled={isDeleted}
-            className="flex-1 text-2xl font-bold text-gray-900 dark:text-white bg-transparent border-b-2 border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none px-2 py-1 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            className="flex-1 text-lg sm:text-2xl font-bold text-gray-900 dark:text-white bg-transparent border-b-2 border-transparent hover:border-gray-300 dark:hover:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none px-1 sm:px-2 py-0.5 sm:py-1 transition-colors disabled:opacity-60 disabled:cursor-not-allowed min-w-0"
             placeholder="Untitled Note"
           />
-          <div className="flex items-center space-x-3 ml-4">
-            {/* Markdown Help Button */}
-            <button
-              onClick={() => setShowMarkdownHelp(true)}
-              disabled={isDeleted}
-              className="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-              title="Markdown syntax help"
-            >
-              <HelpCircle className="w-5 h-5" />
-            </button>
-
-            {/* Save Status */}
-            <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1 sm:space-x-3 flex-shrink-0">
+            {/* Save Status - hide text on mobile */}
+            <div className="flex items-center space-x-1 sm:space-x-2">
               {isSaving ? (
-                <span className="text-sm text-gray-500 dark:text-gray-400 dark:text-gray-500">Saving...</span>
+                <span className="hidden sm:inline text-sm text-gray-500 dark:text-gray-400">Saving...</span>
               ) : lastSaved ? (
-                <span className="text-sm text-gray-500 dark:text-gray-400 dark:text-gray-500">
+                <span className="hidden sm:inline text-sm text-gray-500 dark:text-gray-400">
                   Saved {formatSaveTime(lastSaved)}
                 </span>
               ) : null}
               <button
                 onClick={handleManualSave}
-                className="p-2 text-gray-600 dark:text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:text-white hover:bg-gray-100 dark:bg-gray-700 rounded-md"
-                title="Save now (Ctrl+S)"
+                className="p-1.5 sm:p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+                title={isSaving ? 'Saving...' : lastSaved ? `Saved ${formatSaveTime(lastSaved)}` : 'Save now'}
               >
                 <Save className="w-4 h-4" />
               </button>
             </div>
 
+            {/* Editor Mode Toggle - compact */}
+            <button
+              onClick={() => setEditorMode(editorMode === 'formatted' ? 'raw' : 'formatted')}
+              disabled={isDeleted}
+              className="p-1.5 sm:p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              title={editorMode === 'formatted' ? 'Switch to raw markdown' : 'Switch to formatted view'}
+            >
+              {editorMode === 'formatted' ? <Code className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+
+            {/* Markdown Help Button */}
+            <button
+              onClick={() => setShowMarkdownHelp(true)}
+              disabled={isDeleted}
+              className="hidden sm:block p-1.5 sm:p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              title="Markdown syntax help"
+            >
+              <HelpCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+
             {/* Restore Button (for trash) */}
             {note?.deleted && (
               <button
                 onClick={handleRestoreNote}
-                className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md"
+                className="p-1.5 sm:p-2 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md"
                 title="Restore note"
               >
                 <RotateCcw className="w-4 h-4" />
@@ -392,7 +404,7 @@ export function NoteEditor({ noteId, onNoteDeleted, onTagsChanged, onNoteUpdated
             {/* Delete Button */}
             <button
               onClick={handleDeleteNote}
-              className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md"
+              className="p-1.5 sm:p-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md"
               title={note?.deleted ? "Permanently delete" : "Move to trash"}
             >
               <Trash2 className="w-4 h-4" />
@@ -400,8 +412,8 @@ export function NoteEditor({ noteId, onNoteDeleted, onTagsChanged, onNoteUpdated
           </div>
         </div>
 
-        {/* Folder Selector and Tags Row */}
-        <div className="flex items-center space-x-4">
+        {/* Folder Selector and Tags Row - stacked on mobile */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
           {/* Folder Selector */}
           <div className="flex items-center space-x-2 min-w-0">
             <Folder className="w-4 h-4 text-gray-500 flex-shrink-0" />
@@ -436,93 +448,154 @@ export function NoteEditor({ noteId, onNoteDeleted, onTagsChanged, onNoteUpdated
           </div>
         </div>
 
-        {/* Editor Mode Toggle - Below Tags */}
-        <div className="flex justify-end pt-2">
+        {/* AI Actions - Collapsible on mobile, horizontal on desktop */}
+        <div className="border-t border-gray-100 dark:border-gray-700 pt-2">
+          {/* Mobile: Collapsible toggle */}
           <button
-            onClick={() => setEditorMode(editorMode === 'formatted' ? 'raw' : 'formatted')}
-            disabled={isDeleted}
-            className="flex items-center space-x-1 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-            title={editorMode === 'formatted' ? 'Switch to raw markdown' : 'Switch to formatted view'}
+            onClick={() => setShowAiActions(!showAiActions)}
+            className="sm:hidden flex items-center space-x-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-purple-600 dark:hover:text-purple-400 transition-colors w-full"
           >
-            {editorMode === 'formatted' ? (
-              <>
-                <Code className="w-4 h-4" />
-                <span>Raw</span>
-              </>
+            <Sparkles className="w-4 h-4 text-purple-600" />
+            <span>AI Actions</span>
+            {showAiActions ? (
+              <ChevronUp className="w-4 h-4 ml-auto" />
             ) : (
-              <>
-                <Eye className="w-4 h-4" />
-                <span>Formatted</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* AI Actions */}
-        <div className="flex items-center space-x-2 pt-2">
-          <Sparkles className="w-4 h-4 text-purple-600" />
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-200">AI Actions:</span>
-
-          <button
-            onClick={handleAISummarize}
-            disabled={!content.trim() || aiLoading === 'summarize'}
-            className="px-3 py-1 text-xs font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
-            title="Generate summary and add to beginning of note"
-          >
-            {aiLoading === 'summarize' ? (
-              <>
-                <span className="inline-block animate-spin">⏳</span>
-                <span>Summarizing...</span>
-              </>
-            ) : (
-              <>
-                <FileTextIcon className="w-3 h-3" />
-                <span>Summarize</span>
-              </>
+              <ChevronDown className="w-4 h-4 ml-auto" />
             )}
           </button>
 
-          <button
-            onClick={handleAISuggestTitle}
-            disabled={!content.trim() || aiLoading === 'title'}
-            className="px-3 py-1 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
-            title="Suggest a title based on content"
-          >
-            {aiLoading === 'title' ? (
-              <>
-                <span className="inline-block animate-spin">⏳</span>
-                <span>Generating...</span>
-              </>
-            ) : (
-              <>
-                <FileTextIcon className="w-3 h-3" />
-                <span>Suggest Title</span>
-              </>
-            )}
-          </button>
+          {/* Mobile: Collapsible content */}
+          {showAiActions && (
+            <div className="sm:hidden flex flex-wrap items-center gap-2 mt-2">
+              <button
+                onClick={handleAISummarize}
+                disabled={!content.trim() || aiLoading === 'summarize'}
+                className="px-3 py-1 text-xs font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+                title="Generate summary and add to beginning of note"
+              >
+                {aiLoading === 'summarize' ? (
+                  <>
+                    <span className="inline-block animate-spin">⏳</span>
+                    <span>Summarizing...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileTextIcon className="w-3 h-3" />
+                    <span>Summarize</span>
+                  </>
+                )}
+              </button>
 
-          <button
-            onClick={handleAISuggestTags}
-            disabled={!content.trim() || aiLoading === 'tags'}
-            className="px-3 py-1 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
-            title="Suggest relevant tags"
-          >
-            {aiLoading === 'tags' ? (
-              <>
-                <span className="inline-block animate-spin">⏳</span>
-                <span>Suggesting...</span>
-              </>
-            ) : (
-              <>
-                <Tags className="w-3 h-3" />
-                <span>Suggest Tags</span>
-              </>
-            )}
-          </button>
+              <button
+                onClick={handleAISuggestTitle}
+                disabled={!content.trim() || aiLoading === 'title'}
+                className="px-3 py-1 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+                title="Suggest a title based on content"
+              >
+                {aiLoading === 'title' ? (
+                  <>
+                    <span className="inline-block animate-spin">⏳</span>
+                    <span>Generating...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileTextIcon className="w-3 h-3" />
+                    <span>Suggest Title</span>
+                  </>
+                )}
+              </button>
 
-          {aiError && (
-            <span className="text-xs text-red-600">{aiError}</span>
+              <button
+                onClick={handleAISuggestTags}
+                disabled={!content.trim() || aiLoading === 'tags'}
+                className="px-3 py-1 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+                title="Suggest relevant tags"
+              >
+                {aiLoading === 'tags' ? (
+                  <>
+                    <span className="inline-block animate-spin">⏳</span>
+                    <span>Suggesting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Tags className="w-3 h-3" />
+                    <span>Suggest Tags</span>
+                  </>
+                )}
+              </button>
+
+              {aiError && (
+                <span className="text-xs text-red-600">{aiError}</span>
+              )}
+            </div>
           )}
+
+          {/* Desktop: Always visible horizontal layout */}
+          <div className="hidden sm:flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-purple-600" />
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">AI:</span>
+
+            <button
+              onClick={handleAISummarize}
+              disabled={!content.trim() || aiLoading === 'summarize'}
+              className="px-3 py-1 text-xs font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300 dark:hover:bg-purple-900/50 rounded-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+              title="Generate summary and add to beginning of note"
+            >
+              {aiLoading === 'summarize' ? (
+                <>
+                  <span className="inline-block animate-spin">⏳</span>
+                  <span>Summarizing...</span>
+                </>
+              ) : (
+                <>
+                  <FileTextIcon className="w-3 h-3" />
+                  <span>Summarize</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={handleAISuggestTitle}
+              disabled={!content.trim() || aiLoading === 'title'}
+              className="px-3 py-1 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 rounded-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+              title="Suggest a title based on content"
+            >
+              {aiLoading === 'title' ? (
+                <>
+                  <span className="inline-block animate-spin">⏳</span>
+                  <span>Generating...</span>
+                </>
+              ) : (
+                <>
+                  <FileTextIcon className="w-3 h-3" />
+                  <span>Suggest Title</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={handleAISuggestTags}
+              disabled={!content.trim() || aiLoading === 'tags'}
+              className="px-3 py-1 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-300 dark:hover:bg-green-900/50 rounded-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+              title="Suggest relevant tags"
+            >
+              {aiLoading === 'tags' ? (
+                <>
+                  <span className="inline-block animate-spin">⏳</span>
+                  <span>Suggesting...</span>
+                </>
+              ) : (
+                <>
+                  <Tags className="w-3 h-3" />
+                  <span>Suggest Tags</span>
+                </>
+              )}
+            </button>
+
+            {aiError && (
+              <span className="text-xs text-red-600">{aiError}</span>
+            )}
+          </div>
         </div>
       </div>
 

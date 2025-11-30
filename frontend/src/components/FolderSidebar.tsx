@@ -1,11 +1,14 @@
 import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { foldersApi, tagsApi, notesApi } from '../lib/api';
-import { ChevronLeft, ChevronRight, Folder, FolderPlus, Tag, ChevronDown, ChevronUp, FileQuestion, Trash2, CheckSquare } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Folder, FolderPlus, Tag, ChevronDown, ChevronUp, FileQuestion, Trash2, CheckSquare, Sparkles } from 'lucide-react';
 import { EditableListItem } from './EditableListItem';
+import { FolderIcon, FolderIconPicker } from './FolderIconPicker';
+import { WhatsNewModal, hasNewVersion } from './WhatsNewModal';
 
 interface FolderData {
   id: string;
   name: string;
+  icon: string;
   noteCount: number;
   createdAt: string;
   updatedAt: string;
@@ -53,8 +56,15 @@ export const FolderSidebar = forwardRef<FolderSidebarHandle, FolderSidebarProps>
   const [isLoading, setIsLoading] = useState(true);
   const [showNewFolderInput, setShowNewFolderInput] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
+  const [newFolderIcon, setNewFolderIcon] = useState('folder');
   const [tagsExpanded, setTagsExpanded] = useState(true);
   const [isDragOverUnfiled, setIsDragOverUnfiled] = useState(false);
+  // Track editing state for folder icons
+  const [editingFolderIcons, setEditingFolderIcons] = useState<Record<string, string>>({});
+  // What's New modal state
+  const [showWhatsNew, setShowWhatsNew] = useState(false);
+  const currentVersion = import.meta.env.VITE_APP_VERSION || '0.0.0';
+  const [showNewBadge, setShowNewBadge] = useState(() => hasNewVersion(currentVersion));
 
   useEffect(() => {
     const loadAll = async () => {
@@ -117,8 +127,9 @@ export const FolderSidebar = forwardRef<FolderSidebarHandle, FolderSidebarProps>
     if (!newFolderName.trim()) return;
 
     try {
-      await foldersApi.create({ name: newFolderName.trim() });
+      await foldersApi.create({ name: newFolderName.trim(), icon: newFolderIcon });
       setNewFolderName('');
+      setNewFolderIcon('folder');
       setShowNewFolderInput(false);
       loadFolders();
     } catch (error: any) {
@@ -127,17 +138,41 @@ export const FolderSidebar = forwardRef<FolderSidebarHandle, FolderSidebarProps>
   };
 
   const handleRenameFolder = async (folderId: string, newName: string) => {
+    const folder = folders.find(f => f.id === folderId);
+    if (!folder) return;
+
+    const editedIcon = editingFolderIcons[folderId];
+    const nameChanged = newName !== folder.name;
+    const iconChanged = editedIcon && editedIcon !== folder.icon;
+
+    // Clear editing icon state
+    setEditingFolderIcons(prev => {
+      const next = { ...prev };
+      delete next[folderId];
+      return next;
+    });
+
+    // If nothing changed, no need to call API
+    if (!nameChanged && !iconChanged) {
+      return;
+    }
+
+    // Build payload with only changed fields
+    const payload: { name?: string; icon?: string } = {};
+    if (nameChanged) payload.name = newName;
+    if (iconChanged) payload.icon = editedIcon;
+
     // Optimistic update
     const originalFolders = folders;
     const updatedFolders = folders.map((f) =>
-      f.id === folderId ? { ...f, name: newName } : f
+      f.id === folderId ? { ...f, ...payload } : f
     );
     setFolders(updatedFolders);
 
     try {
-      await foldersApi.update(folderId, { name: newName });
+      await foldersApi.update(folderId, payload);
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to rename folder');
+      alert(error.response?.data?.message || 'Failed to update folder');
       setFolders(originalFolders); // Revert on error
     }
   };
@@ -257,31 +292,40 @@ export const FolderSidebar = forwardRef<FolderSidebarHandle, FolderSidebarProps>
       {/* New Folder Input */}
       {showNewFolderInput && (
         <div className="p-2 border-b border-gray-200 dark:border-gray-700">
-          <form onSubmit={handleCreateFolder} className="flex space-x-1">
-            <input
-              type="text"
-              value={newFolderName}
-              onChange={(e) => setNewFolderName(e.target.value)}
-              placeholder="Folder name"
-              className="flex-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              autoFocus
-            />
-            <button
-              type="submit"
-              className="px-2 py-1 text-sm bg-blue-600 dark:bg-blue-500 text-white rounded hover:bg-blue-700"
-            >
-              Add
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setShowNewFolderInput(false);
-                setNewFolderName('');
-              }}
-              className="px-2 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-            >
-              Cancel
-            </button>
+          <form onSubmit={handleCreateFolder} className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <FolderIconPicker
+                selectedIcon={newFolderIcon}
+                onSelectIcon={setNewFolderIcon}
+              />
+              <input
+                type="text"
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                placeholder="Folder name"
+                className="flex-1 min-w-0 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNewFolderInput(false);
+                  setNewFolderName('');
+                  setNewFolderIcon('folder');
+                }}
+                className="px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-3 py-1 text-sm bg-blue-600 dark:bg-blue-500 text-white rounded hover:bg-blue-700"
+              >
+                Add
+              </button>
+            </div>
           </form>
         </div>
       )}
@@ -406,7 +450,20 @@ export const FolderSidebar = forwardRef<FolderSidebarHandle, FolderSidebarProps>
               id={folder.id}
               name={folder.name}
               count={folder.noteCount}
-              icon={<Folder className="w-5 h-5 text-gray-400 dark:text-gray-500" />}
+              renderIcon={(isEditing) => {
+                if (isEditing) {
+                  // Show icon picker when editing
+                  const currentEditIcon = editingFolderIcons[folder.id] ?? folder.icon;
+                  return (
+                    <FolderIconPicker
+                      selectedIcon={currentEditIcon}
+                      onSelectIcon={(icon) => setEditingFolderIcons(prev => ({ ...prev, [folder.id]: icon }))}
+                    />
+                  );
+                }
+                // Show static icon in view mode
+                return <FolderIcon icon={folder.icon} className="w-5 h-5 text-gray-400 dark:text-gray-500" />;
+              }}
               isSelected={selectedFolderId === folder.id}
               onSelect={() => onSelectFolder(folder.id)}
               onRename={handleRenameFolder}
@@ -461,10 +518,29 @@ export const FolderSidebar = forwardRef<FolderSidebarHandle, FolderSidebarProps>
 
       {/* Version Footer */}
       <div className="mt-auto border-t border-gray-200 dark:border-gray-700 px-4 py-2 bg-gray-50 dark:bg-gray-900">
-        <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-          v{import.meta.env.VITE_APP_VERSION}
-        </p>
+        <button
+          onClick={() => {
+            setShowWhatsNew(true);
+            setShowNewBadge(false);
+          }}
+          className="w-full flex items-center justify-center gap-2 text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+        >
+          {showNewBadge && (
+            <span className="flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 rounded-full text-[10px] font-medium animate-pulse">
+              <Sparkles className="w-3 h-3" />
+              NEW
+            </span>
+          )}
+          <span>v{currentVersion}</span>
+        </button>
       </div>
+
+      {/* What's New Modal */}
+      <WhatsNewModal
+        isOpen={showWhatsNew}
+        onClose={() => setShowWhatsNew(false)}
+        currentVersion={currentVersion}
+      />
     </div>
   );
 });

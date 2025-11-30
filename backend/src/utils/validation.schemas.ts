@@ -77,13 +77,23 @@ export const listNotesQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
+// Folder icon options - curated Lucide icons
+export const FOLDER_ICONS = [
+  'folder', 'folder-open', 'briefcase', 'home', 'star', 'heart', 'bookmark',
+  'file-text', 'code', 'terminal', 'book', 'archive', 'inbox', 'lightbulb',
+  'target', 'flag', 'calendar', 'clock', 'users', 'user', 'settings',
+  'camera', 'music', 'video', 'image', 'globe', 'map-pin', 'shopping-bag',
+] as const;
+
 // Folder schemas
 export const createFolderSchema = z.object({
   name: z.string().min(1, 'Folder name is required').max(255, 'Folder name must not exceed 255 characters'),
+  icon: z.enum(FOLDER_ICONS).default('folder').optional(),
 });
 
 export const updateFolderSchema = z.object({
-  name: z.string().min(1, 'Folder name is required').max(255, 'Folder name must not exceed 255 characters'),
+  name: z.string().min(1, 'Folder name is required').max(255, 'Folder name must not exceed 255 characters').optional(),
+  icon: z.enum(FOLDER_ICONS).optional(),
 });
 
 // AI schemas
