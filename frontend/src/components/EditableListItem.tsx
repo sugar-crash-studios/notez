@@ -49,9 +49,15 @@ export function EditableListItem({
     const trimmedName = editingName.trim();
     if (!trimmedName) return;
 
-    setIsEditing(false);
-    setEditingName('');
-    await onRename(id, trimmedName);
+    try {
+      await onRename(id, trimmedName);
+      // Only clear editing state on success
+      setIsEditing(false);
+      setEditingName('');
+    } catch (error) {
+      // Parent component shows alert; keep edit mode open for retry
+      console.error('Failed to save:', error);
+    }
   };
 
   const handleDelete = async () => {

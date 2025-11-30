@@ -1,8 +1,38 @@
 # Claude Code Instructions for Notez
 
-## Git Workflow Rules
+## ⛔ CRITICAL: Command Execution Rule
+**NEVER chain bash commands with `&&` or `||`**
 
-**CRITICAL: You are FORBIDDEN from committing directly to the `main` branch.**
+This is blocked by the deny list and will fail. Always run commands separately, one at a time.
+
+```bash
+# WRONG - will be blocked
+git add . && git commit -m "message"
+
+# CORRECT - run separately
+git add .
+git commit -m "message"
+```
+
+## ⛔ CRITICAL: Branch Protection Rule
+**NEVER commit directly to the `main` branch.**
+Always create a new branch for your changes.
+
+```bash
+# WRONG - will be blocked
+git checkout main
+git add .
+git commit -m "message"
+
+# CORRECT - create a new branch
+git checkout -b feature/new-feature
+git add .
+git commit -m "message"
+```
+
+### Branch Protection
+- All pushes to `main` are blocked
+- All merges to `main` require PR approval
 
 ### Automated Enforcement
 
@@ -37,6 +67,7 @@ git config core.hooksPath .githooks
    - Delete feature branch after merge
 
 4. **Before Every Commit**
+
    ```bash
    # ALWAYS run this first
    git branch --show-current
@@ -98,7 +129,7 @@ You have extensive autonomous permissions to:
 
 ## Project Structure
 
-```
+```text
 /notez
 ├── backend/          # Fastify + TypeScript backend
 ├── frontend/         # React + TypeScript frontend
@@ -128,7 +159,6 @@ You have extensive autonomous permissions to:
 
 - Use `ls` instead of `dir` for listing files (Git Bash compatibility)
 - Use absolute paths when possible to avoid directory confusion
-- **NEVER chain commands with `&&`** - this triggers permission prompts. Run commands separately one at a time.
 - Use forward slashes in paths (works in both PowerShell and Git Bash)
 
 ## References

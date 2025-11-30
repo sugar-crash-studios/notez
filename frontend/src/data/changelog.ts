@@ -12,6 +12,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.30.1',
+    date: '2024-11-30',
+    fixed: [
+      'Folders not loading after v0.30.0 update (missing database migration for icon column)',
+    ],
+  },
+  {
     version: '0.30.0',
     date: '2024-11-30',
     added: [

@@ -145,15 +145,13 @@ export const FolderSidebar = forwardRef<FolderSidebarHandle, FolderSidebarProps>
     const nameChanged = newName !== folder.name;
     const iconChanged = editedIcon && editedIcon !== folder.icon;
 
-    // Clear editing icon state
-    setEditingFolderIcons(prev => {
-      const next = { ...prev };
-      delete next[folderId];
-      return next;
-    });
-
-    // If nothing changed, no need to call API
+    // If nothing changed, just clear editing state and return
     if (!nameChanged && !iconChanged) {
+      setEditingFolderIcons(prev => {
+        const next = { ...prev };
+        delete next[folderId];
+        return next;
+      });
       return;
     }
 
@@ -171,9 +169,16 @@ export const FolderSidebar = forwardRef<FolderSidebarHandle, FolderSidebarProps>
 
     try {
       await foldersApi.update(folderId, payload);
+      // Clear editing icon state only on success
+      setEditingFolderIcons(prev => {
+        const next = { ...prev };
+        delete next[folderId];
+        return next;
+      });
     } catch (error: any) {
       alert(error.response?.data?.message || 'Failed to update folder');
       setFolders(originalFolders); // Revert on error
+      throw error; // Re-throw so EditableListItem keeps edit mode open
     }
   };
 
