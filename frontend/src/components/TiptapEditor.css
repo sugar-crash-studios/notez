@@ -300,3 +300,77 @@
 .dark .tiptap-editor img[src=""] {
   background-color: #374151;
 }
+
+/* Resizable image wrapper */
+.resizable-image-wrapper {
+  display: block;
+  margin: 1rem 0;
+}
+
+.resizable-image-container {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
+
+.resizable-image-container img {
+  display: block;
+  border-radius: 8px;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Selected state */
+.resizable-image-container.selected {
+  outline: 3px solid #3b82f6;
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+
+.dark .resizable-image-container.selected {
+  outline-color: #60a5fa;
+}
+
+/* Resize handles */
+.resize-handle {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 48px;
+  background: #3b82f6;
+  border-radius: 4px;
+  cursor: ew-resize;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 10;
+}
+
+.resizable-image-container.selected .resize-handle {
+  opacity: 0.7;
+}
+
+.resizable-image-container.selected .resize-handle:hover {
+  opacity: 1;
+}
+
+.resize-handle-left {
+  left: -6px;
+}
+
+.resize-handle-right {
+  right: -6px;
+}
+
+.dark .resize-handle {
+  background: #60a5fa;
+}
+
+/* During resize */
+.resizable-image-container.resizing {
+  cursor: ew-resize;
+}
+
+.resizable-image-container.resizing .resize-handle {
+  opacity: 1;
+}

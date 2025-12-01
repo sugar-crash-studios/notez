@@ -11,6 +11,7 @@ import { gfm } from 'turndown-plugin-gfm';
 import { marked } from 'marked';
 import { ImageUploadExtension } from './TiptapImageExtension';
 import { uploadImage } from '../api/images';
+import { ImagePlus } from 'lucide-react';
 import './TiptapEditor.css';
 
 interface TiptapEditorProps {
@@ -70,14 +71,26 @@ turndownService.addRule('taskListItems', {
 // This comes AFTER our custom rule so our rule takes priority
 turndownService.use(gfm);
 
-// Custom rule for images
+// Custom rule for images (including width for resized images)
 turndownService.addRule('images', {
   filter: 'img',
   replacement: (_content, node: any) => {
     const src = node.getAttribute('src') || '';
     const alt = node.getAttribute('alt') || '';
     const title = node.getAttribute('title');
-    return title ? `![${alt}](${src} "${title}")` : `![${alt}](${src})`;
+    const width = node.getAttribute('width');
+
+    // Build markdown with optional width in title
+    // Format: ![alt](src "title|width=300") or ![alt](src "|width=300")
+    let titlePart = title || '';
+    if (width) {
+      titlePart = titlePart ? `${titlePart}|width=${width}` : `|width=${width}`;
+    }
+
+    if (titlePart) {
+      return `![${alt}](${src} "${titlePart}")`;
+    }
+    return `![${alt}](${src})`;
   },
 });
 
@@ -118,6 +131,19 @@ function markdownToHTML(markdown: string): string {
     // Use marked to parse markdown to HTML
     let html = marked.parse(markdown, { async: false }) as string;
 
+    // Post-process images to extract width from title
+    // Format: <img ... title="optional title|width=300">
+    html = html.replace(/<img([^>]*)\stitle="([^"]*)"([^>]*)>/gi, (_match, before, titleAttr, after) => {
+      const widthMatch = titleAttr.match(/\|width=(\d+)/);
+      if (widthMatch) {
+        const width = widthMatch[1];
+        const cleanTitle = titleAttr.replace(/\|width=\d+/, '').trim();
+        const titlePart = cleanTitle ? ` title="${cleanTitle}"` : '';
+        return `<img${before}${titlePart} width="${width}"${after}>`;
+      }
+      return `<img${before} title="${titleAttr}"${after}>`;
+    });
+
     // Post-process to handle task lists that marked might not catch
     // Make <p> tags optional as a group to handle all list item variations
 
@@ -155,6 +181,7 @@ function markdownToHTML(markdown: string): string {
 export function TiptapEditor({ content, onChange, disabled = false, placeholder = 'Start writing...' }: TiptapEditorProps) {
   const isUpdatingFromProp = useRef(false);
   const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Handle image upload
   const handleImageUpload = useCallback(async (file: File): Promise<string | null> => {
@@ -265,13 +292,59 @@ export function TiptapEditor({ content, onChange, disabled = false, placeholder 
     }
   }, [disabled, editor]);
 
+  // Handle file selection from the upload button
+  const handleFileSelect = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (file && editor) {
+        const url = await handleImageUpload(file);
+        if (url) {
+          editor.chain().focus().setImage({ src: url }).run();
+        }
+      }
+      // Reset input so the same file can be selected again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    },
+    [editor, handleImageUpload]
+  );
+
+  // Trigger file input click
+  const handleUploadClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
   if (!editor) {
     return null;
   }
 
   return (
     <div className="tiptap-wrapper relative">
+      {/* Floating toolbar for image upload */}
+      <div className="absolute top-2 right-2 z-20">
+        <button
+          type="button"
+          onClick={handleUploadClick}
+          disabled={disabled || isUploading}
+          className="p-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          title="Upload image"
+        >
+          <ImagePlus className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+        </button>
+      </div>
+
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/gif,image/webp"
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+
       <EditorContent editor={editor} className="h-full" />
+
       {isUploading && (
         <div className="absolute bottom-4 right-4 bg-blue-500 text-white px-3 py-1.5 rounded-md text-sm flex items-center gap-2 shadow-lg">
           <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

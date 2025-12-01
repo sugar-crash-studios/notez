@@ -1,5 +1,7 @@
 import Image from '@tiptap/extension-image';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { ReactNodeViewRenderer } from '@tiptap/react';
+import { ResizableImage } from './ResizableImage';
 
 export interface ImageUploadOptions {
   onUpload: (file: File) => Promise<string | null>;
@@ -15,7 +17,7 @@ declare module '@tiptap/core' {
 }
 
 /**
- * Extended Image extension with paste and drop upload support
+ * Extended Image extension with paste/drop upload support and inline resizing
  */
 export const ImageUploadExtension = Image.extend<ImageUploadOptions>({
   name: 'image',
@@ -31,6 +33,29 @@ export const ImageUploadExtension = Image.extend<ImageUploadOptions>({
       onUpload: async () => null,
       onError: () => {},
     };
+  },
+
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      width: {
+        default: null,
+        parseHTML: (element) => {
+          const width = element.getAttribute('width');
+          return width ? parseInt(width, 10) : null;
+        },
+        renderHTML: (attributes) => {
+          if (!attributes.width) {
+            return {};
+          }
+          return { width: attributes.width };
+        },
+      },
+    };
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(ResizableImage);
   },
 
   addCommands() {
