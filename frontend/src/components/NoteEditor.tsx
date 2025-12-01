@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import Editor from '@monaco-editor/react';
 import { notesApi, aiApi, foldersApi } from '../lib/api';
-import { Save, Trash2, Sparkles, FileText as FileTextIcon, Tags, RotateCcw, Folder, Eye, Code, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Save, Trash2, Sparkles, FileText as FileTextIcon, Tags, RotateCcw, Eye, Code, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { TagInput } from './TagInput';
 import { TiptapEditor } from './TiptapEditor';
 import { MarkdownHelp } from './MarkdownHelp';
+import { FolderChip } from './FolderChip';
 
 interface Note {
   id: string;
@@ -21,6 +22,7 @@ interface Note {
 interface FolderData {
   id: string;
   name: string;
+  icon: string;
   noteCount: number;
 }
 
@@ -415,22 +417,12 @@ export function NoteEditor({ noteId, onNoteDeleted, onTagsChanged, onNoteUpdated
         {/* Folder Selector and Tags Row - stacked on mobile */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
           {/* Folder Selector */}
-          <div className="flex items-center space-x-2 min-w-0">
-            <Folder className="w-4 h-4 text-gray-500 flex-shrink-0" />
-            <select
-              value={selectedFolderId || ''}
-              onChange={(e) => setSelectedFolderId(e.target.value || null)}
-              disabled={isDeleted}
-              className="text-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <option value="">Unfiled</option>
-              {folders.map((folder) => (
-                <option key={folder.id} value={folder.id}>
-                  {folder.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <FolderChip
+            folders={folders}
+            selectedFolderId={selectedFolderId}
+            onChange={setSelectedFolderId}
+            disabled={isDeleted}
+          />
 
           {/* Tags */}
           <div className="flex-1 min-w-0">

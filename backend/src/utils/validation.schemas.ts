@@ -83,6 +83,9 @@ export const FOLDER_ICONS = [
   'file-text', 'code', 'terminal', 'book', 'archive', 'inbox', 'lightbulb',
   'target', 'flag', 'calendar', 'clock', 'users', 'user', 'settings',
   'camera', 'music', 'video', 'image', 'globe', 'map-pin', 'shopping-bag',
+  // New icons for v0.30.2
+  'palette', 'paintbrush', 'pencil', 'pen', 'pen-tool', 'flower', 'drama',
+  'coffee', 'utensils', 'gift',
 ] as const;
 
 // Folder schemas

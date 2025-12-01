@@ -12,6 +12,19 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.30.2',
+    date: '2024-11-30',
+    added: [
+      'Folder Chip UI: Modern chip-style folder selector with icons in note editor',
+      '10 New Folder Icons: palette, paintbrush, pencil, pen, pen-tool, flower, drama, coffee, utensils, gift',
+    ],
+    fixed: [
+      'Folder counts not updating when moving notes via editor dropdown',
+      'Tag counts not refreshing after adding/removing tags from notes',
+      'Folder icons now display in folder selector dropdown',
+    ],
+  },
+  {
     version: '0.30.1',
     date: '2024-11-30',
     fixed: [

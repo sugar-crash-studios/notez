@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.30.2] - 2024-11-30
+
+### Added
+- **Folder Chip UI**: Modern chip-style folder selector with icons in note editor
+- **10 New Folder Icons**: palette, paintbrush, pencil, pen, pen-tool, flower, drama, coffee, utensils, gift
+
+### Fixed
+- Folder counts not updating when moving notes via editor dropdown
+- Tag counts not refreshing after adding/removing tags from notes
+- Folder icons now display in folder selector dropdown
+
 ## [0.30.1] - 2024-11-30
 
 ### Fixed

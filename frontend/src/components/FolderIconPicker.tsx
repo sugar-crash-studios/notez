@@ -28,6 +28,17 @@ import {
   Globe,
   MapPin,
   ShoppingBag,
+  // New icons for v0.30.2
+  Palette,
+  Paintbrush,
+  Pencil,
+  Pen,
+  PenTool,
+  Flower2,
+  Drama,
+  Coffee,
+  Utensils,
+  Gift,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -61,6 +72,17 @@ export const FOLDER_ICON_MAP: Record<string, LucideIcon> = {
   'globe': Globe,
   'map-pin': MapPin,
   'shopping-bag': ShoppingBag,
+  // New icons for v0.30.2
+  'palette': Palette,
+  'paintbrush': Paintbrush,
+  'pencil': Pencil,
+  'pen': Pen,
+  'pen-tool': PenTool,
+  'flower': Flower2,
+  'drama': Drama,
+  'coffee': Coffee,
+  'utensils': Utensils,
+  'gift': Gift,
 };
 
 export const FOLDER_ICONS = Object.keys(FOLDER_ICON_MAP);

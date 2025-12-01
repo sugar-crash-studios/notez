@@ -182,6 +182,10 @@ export function EditorPage() {
               }}
               onNoteUpdated={(noteId, updates) => {
                 noteListRef.current?.updateNote(noteId, updates);
+                // Refresh folder counts if folder changed
+                if (updates.folderId !== undefined) {
+                  sidebarRef.current?.refreshFolders();
+                }
               }}
               onNoteRestored={(noteId) => {
                 setSelectedNoteId(null);
