@@ -1,4 +1,23 @@
 services:
+  # MinIO Object Storage (S3-compatible)
+  notez-minio:
+    image: minio/minio:latest
+    container_name: notez-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-notez}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?Please set MINIO_SECRET_KEY}
+    volumes:
+      - notez_minio:/data
+    networks:
+      - notez-network
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
   # PostgreSQL Database
   notez-postgres:
     image: postgres:16-alpine
@@ -50,11 +69,20 @@ services:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Please set ENCRYPTION_KEY}
       CORS_ORIGIN: ${CORS_ORIGIN:-https://notez.curgghoth.com}
       COOKIE_SECRET: ${COOKIE_SECRET:-${JWT_REFRESH_SECRET}}
+      # MinIO Configuration
+      MINIO_ENDPOINT: notez-minio
+      MINIO_PORT: 9000
+      MINIO_USE_SSL: false
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-notez}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: ${MINIO_BUCKET:-notez-images}
     depends_on:
       notez-postgres:
         condition: service_healthy
       notez-migrations:
         condition: service_completed_successfully
+      notez-minio:
+        condition: service_healthy
     networks:
       - notez-network
 
@@ -74,4 +102,10 @@ volumes:
     driver_opts:
       type: none
       device: /datapool/docker/notez/config
+      o: bind
+  notez_minio:
+    driver: local
+    driver_opts:
+      type: none
+      device: /datapool/docker/notez/minio
       o: bind

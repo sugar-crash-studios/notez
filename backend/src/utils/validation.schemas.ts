@@ -86,6 +86,9 @@ export const FOLDER_ICONS = [
   // New icons for v0.30.2
   'palette', 'paintbrush', 'pencil', 'pen', 'pen-tool', 'flower', 'drama',
   'coffee', 'utensils', 'gift',
+  // New tech/homelab icons for v0.31.0
+  'server', 'cpu', 'hard-drive', 'network', 'wifi', 'database', 'cloud',
+  'monitor', 'laptop', 'smartphone',
 ] as const;
 
 // Folder schemas

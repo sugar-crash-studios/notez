@@ -1,4 +1,24 @@
 services:
+  # MinIO Object Storage (S3-compatible)
+  minio:
+    image: minio/minio:latest
+    container_name: notez-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: notez
+      MINIO_ROOT_PASSWORD: notez-secret
+    ports:
+      - "9000:9000"   # API
+      - "9001:9001"   # Console
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
   # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
@@ -36,8 +56,17 @@ services:
       JWT_REFRESH_SECRET: dev-refresh-secret-change-in-production
       ENCRYPTION_KEY: dev-encryption-key-change-prod
       CORS_ORIGIN: http://localhost:5173
+      # MinIO Configuration
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_USE_SSL: false
+      MINIO_ACCESS_KEY: notez
+      MINIO_SECRET_KEY: notez-secret
+      MINIO_BUCKET: notez-images
     depends_on:
       postgres:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     volumes:
       - ./backend/src:/app/src
@@ -63,3 +92,4 @@ services:
 
 volumes:
   postgres_data:
+  minio_data:

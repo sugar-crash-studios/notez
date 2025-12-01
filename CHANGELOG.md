@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.0] - 2024-12-01
+
+### Added
+
+- **Image Support**: Paste, drag-drop, or upload images directly into notes
+- **MinIO Storage Integration**: S3-compatible object storage for scalable image hosting
+- **10 New Tech/Homelab Icons**: server, cpu, hard-drive, network, wifi, database, cloud, monitor, laptop, smartphone
+
+### Changed
+
+- Docker compose now includes MinIO service for image storage
+- Images automatically optimized (resize, compress) on upload
+
+### Technical
+
+- Added `@tiptap/extension-image` for editor image support
+- Added `@fastify/multipart` for file uploads
+- New `Image` model in database schema for tracking image metadata
+
 ## [0.30.2] - 2024-11-30
 
 ### Added

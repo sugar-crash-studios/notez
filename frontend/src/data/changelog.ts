@@ -12,6 +12,19 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '0.31.0',
+    date: '2024-12-01',
+    added: [
+      'Image Support: Paste, drag-drop, or upload images directly into notes',
+      'MinIO Storage: S3-compatible object storage for scalable image hosting',
+      '10 New Tech/Homelab Icons: server, cpu, hard-drive, network, wifi, database, cloud, monitor, laptop, smartphone',
+    ],
+    changed: [
+      'Docker compose now includes MinIO service for image storage',
+      'Images automatically optimized (resize, compress) on upload',
+    ],
+  },
+  {
     version: '0.30.2',
     date: '2024-11-30',
     added: [

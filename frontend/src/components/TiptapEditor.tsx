@@ -5,10 +5,12 @@ import TaskItem from '@tiptap/extension-task-item';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import Typography from '@tiptap/extension-typography';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import TurndownService from 'turndown';
 import { gfm } from 'turndown-plugin-gfm';
 import { marked } from 'marked';
+import { ImageUploadExtension } from './TiptapImageExtension';
+import { uploadImage } from '../api/images';
 import './TiptapEditor.css';
 
 interface TiptapEditorProps {
@@ -67,6 +69,17 @@ turndownService.addRule('taskListItems', {
 // Add GFM (GitHub Flavored Markdown) support for task lists
 // This comes AFTER our custom rule so our rule takes priority
 turndownService.use(gfm);
+
+// Custom rule for images
+turndownService.addRule('images', {
+  filter: 'img',
+  replacement: (_content, node: any) => {
+    const src = node.getAttribute('src') || '';
+    const alt = node.getAttribute('alt') || '';
+    const title = node.getAttribute('title');
+    return title ? `![${alt}](${src} "${title}")` : `![${alt}](${src})`;
+  },
+});
 
 // Configure marked to handle task lists
 marked.use({
@@ -141,6 +154,22 @@ function markdownToHTML(markdown: string): string {
 
 export function TiptapEditor({ content, onChange, disabled = false, placeholder = 'Start writing...' }: TiptapEditorProps) {
   const isUpdatingFromProp = useRef(false);
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Handle image upload
+  const handleImageUpload = useCallback(async (file: File): Promise<string | null> => {
+    setIsUploading(true);
+    try {
+      const result = await uploadImage(file);
+      return result.url;
+    } catch (error) {
+      console.error('Failed to upload image:', error);
+      // Could show a toast notification here
+      return null;
+    } finally {
+      setIsUploading(false);
+    }
+  }, []);
 
   const editor = useEditor({
     extensions: [
@@ -172,6 +201,12 @@ export function TiptapEditor({ content, onChange, disabled = false, placeholder 
         placeholder,
       }),
       Typography,
+      ImageUploadExtension.configure({
+        onUpload: handleImageUpload,
+        onError: (error) => {
+          console.error('Image upload error:', error);
+        },
+      }),
     ],
     content: markdownToHTML(content),
     editable: !disabled,
@@ -235,8 +270,17 @@ export function TiptapEditor({ content, onChange, disabled = false, placeholder 
   }
 
   return (
-    <div className="tiptap-wrapper">
+    <div className="tiptap-wrapper relative">
       <EditorContent editor={editor} className="h-full" />
+      {isUploading && (
+        <div className="absolute bottom-4 right-4 bg-blue-500 text-white px-3 py-1.5 rounded-md text-sm flex items-center gap-2 shadow-lg">
+          <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Uploading image...
+        </div>
+      )}
     </div>
   );
 }

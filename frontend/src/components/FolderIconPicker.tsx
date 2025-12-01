@@ -39,6 +39,17 @@ import {
   Coffee,
   Utensils,
   Gift,
+  // New tech/homelab icons for v0.31.0
+  Server,
+  Cpu,
+  HardDrive,
+  Network,
+  Wifi,
+  Database,
+  Cloud,
+  Monitor,
+  Laptop,
+  Smartphone,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -83,6 +94,17 @@ export const FOLDER_ICON_MAP: Record<string, LucideIcon> = {
   'coffee': Coffee,
   'utensils': Utensils,
   'gift': Gift,
+  // New tech/homelab icons for v0.31.0
+  'server': Server,
+  'cpu': Cpu,
+  'hard-drive': HardDrive,
+  'network': Network,
+  'wifi': Wifi,
+  'database': Database,
+  'cloud': Cloud,
+  'monitor': Monitor,
+  'laptop': Laptop,
+  'smartphone': Smartphone,
 };
 
 export const FOLDER_ICONS = Object.keys(FOLDER_ICON_MAP);

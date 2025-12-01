@@ -265,3 +265,38 @@
 .dark .tiptap-editor p.is-editor-empty:first-child::before {
   color: #6b7280;
 }
+
+/* Image styles */
+.tiptap-editor img,
+.tiptap-editor .tiptap-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 1rem 0;
+  display: block;
+}
+
+/* Selected image indicator */
+.tiptap-editor img.ProseMirror-selectednode,
+.tiptap-editor .tiptap-image.ProseMirror-selectednode {
+  outline: 3px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.dark .tiptap-editor img.ProseMirror-selectednode,
+.dark .tiptap-editor .tiptap-image.ProseMirror-selectednode {
+  outline-color: #60a5fa;
+}
+
+/* Image loading placeholder style */
+.tiptap-editor img[src=""] {
+  background-color: #f3f4f6;
+  min-height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dark .tiptap-editor img[src=""] {
+  background-color: #374151;
+}

@@ -33,6 +33,7 @@ model User {
   notes      Note[]
   tags       Tag[]
   tasks      Task[]
+  images     Image[]
   aiSettings UserAISettings?
 
   @@map("users")
@@ -88,6 +89,7 @@ model Note {
   folder Folder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
   tags   NoteTag[]
   tasks  Task[]
+  images Image[]
 
   @@index([searchVector], type: Gin)
   @@map("notes")
@@ -209,4 +211,25 @@ model UserAISettings {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_ai_settings")
+}
+
+// Image storage metadata
+model Image {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  noteId    String?  @map("note_id")
+  filename  String   @db.VarChar(255)
+  mimeType  String   @map("mime_type") @db.VarChar(50)
+  size      Int      // File size in bytes
+  width     Int?
+  height    Int?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  note Note? @relation(fields: [noteId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([noteId])
+  @@map("images")
 }

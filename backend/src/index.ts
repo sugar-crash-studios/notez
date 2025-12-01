@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import jwt from '@fastify/jwt';
+import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -15,7 +16,9 @@ import { tagRoutes } from './routes/tags.routes.js';
 import { tasksRoutes } from './routes/tasks.routes.js';
 import { aiRoutes } from './routes/ai.routes.js';
 import { searchRoutes } from './routes/search.routes.js';
+import { imagesRoutes } from './routes/images.routes.js';
 import { prisma, disconnectPrisma } from './lib/db.js';
+import { storageService } from './services/storage.service.js';
 
 // Configure DATABASE_URL from components if not explicitly set
 // This allows using POSTGRES_USER, POSTGRES_PASSWORD, etc. instead of hardcoded URL
@@ -54,6 +57,13 @@ await fastify.register(jwt, {
   },
 });
 
+// Register multipart plugin for file uploads
+await fastify.register(multipart, {
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB max file size
+  },
+});
+
 // Health check endpoint
 fastify.get('/health', async () => {
   try {
@@ -73,6 +83,7 @@ await fastify.register(tagRoutes, { prefix: '/api/tags' });
 await fastify.register(tasksRoutes, { prefix: '/api' });
 await fastify.register(aiRoutes, { prefix: '/api/ai' });
 await fastify.register(searchRoutes, { prefix: '/api/search' });
+await fastify.register(imagesRoutes, { prefix: '/api' });
 
 // Serve frontend static files (in production)
 // Get the directory of the current module
@@ -105,6 +116,14 @@ const start = async () => {
   try {
     const port = parseInt(process.env.PORT || '3000', 10);
     const host = process.env.HOST || '0.0.0.0';
+
+    // Initialize MinIO storage (creates bucket if needed)
+    try {
+      await storageService.initialize();
+    } catch (error) {
+      console.warn('⚠️ MinIO storage not available - image uploads will fail');
+      console.warn('   Make sure MinIO is running and configured properly');
+    }
 
     await fastify.listen({ port, host });
     console.log(`🚀 Notez API server running on http://${host}:${port}`);
