@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { User, Bot, Shield, ArrowLeft } from 'lucide-react';
 import { AppHeader } from '../components/AppHeader';
@@ -35,35 +35,36 @@ export function SettingsHub() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Parse section from URL hash with role validation
-  const getSectionFromHash = useCallback((): SettingsSection => {
-    const hash = location.hash.replace('#', '') as SettingsSection;
-    if (hash && SECTION_CONFIG[hash]) {
+  // Derive active section directly from URL hash (single source of truth)
+  // This avoids useState/useEffect sync loops by computing from URL each render
+  const rawHash = location.hash.replace('#', '') as SettingsSection;
+  const isValidSection = rawHash && SECTION_CONFIG[rawHash];
+  const isUnauthorizedAdmin = rawHash === 'admin' && user?.role !== 'admin';
+
+  const activeSection: SettingsSection = (() => {
+    if (isValidSection) {
       // If admin section requested but user is not admin, default to profile
-      if (hash === 'admin' && user?.role !== 'admin') {
+      if (isUnauthorizedAdmin) {
         return 'profile';
       }
-      return hash;
+      return rawHash;
     }
     return 'profile';
-  }, [location.hash, user?.role]);
+  })();
 
-  const [activeSection, setActiveSection] = useState<SettingsSection>(getSectionFromHash);
-
-  // Update URL hash when section changes (only if different)
+  // One-time URL correction: sync hash when it's invalid or unauthorized
+  // This runs only when there's a mismatch, not on every render
   useEffect(() => {
-    if (location.hash !== `#${activeSection}`) {
+    const needsCorrection = !isValidSection || isUnauthorizedAdmin;
+    if (needsCorrection && location.hash !== `#${activeSection}`) {
       navigate(`/settings#${activeSection}`, { replace: true });
     }
-  }, [activeSection, navigate, location.hash]);
+  }, [isValidSection, isUnauthorizedAdmin, activeSection, location.hash, navigate]);
 
-  // Update section when URL hash changes (e.g., browser back/forward)
-  useEffect(() => {
-    const newSection = getSectionFromHash();
-    if (newSection !== activeSection) {
-      setActiveSection(newSection);
-    }
-  }, [location.hash, getSectionFromHash, activeSection]);
+  // Navigate to section - updates URL which triggers re-render with new activeSection
+  const navigateToSection = useCallback((section: SettingsSection) => {
+    navigate(`/settings#${section}`, { replace: true });
+  }, [navigate]);
 
   // Filter sections based on user role
   const availableSections = Object.entries(SECTION_CONFIG).filter(
@@ -113,7 +114,7 @@ export function SettingsHub() {
               return (
                 <button
                   key={key}
-                  onClick={() => setActiveSection(key)}
+                  onClick={() => navigateToSection(key)}
                   className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors ${
                     isActive
                       ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-600 text-blue-700 dark:text-blue-400'
@@ -151,7 +152,7 @@ export function SettingsHub() {
             id="settings-section-select"
             name="settings-section"
             value={activeSection}
-            onChange={(e) => setActiveSection(e.target.value as SettingsSection)}
+            onChange={(e) => navigateToSection(e.target.value as SettingsSection)}
             className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-white"
           >
             {availableSections.map(([key, config]) => (
