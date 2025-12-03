@@ -4,6 +4,7 @@ import cookie from '@fastify/cookie';
 import jwt from '@fastify/jwt';
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
+import rateLimit from '@fastify/rate-limit';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import 'dotenv/config';
@@ -62,6 +63,28 @@ await fastify.register(jwt, {
 await fastify.register(multipart, {
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB max file size
+  },
+});
+
+// Register rate limiting plugin for brute force protection
+// Global defaults - specific routes will have stricter limits
+await fastify.register(rateLimit, {
+  max: 100, // 100 requests per minute for general endpoints
+  timeWindow: '1 minute',
+  // Skip rate limiting in development for easier testing
+  // In production, this should always be enabled
+  skipOnError: process.env.NODE_ENV !== 'production',
+  // Use real client IP when behind proxy (trustProxy is enabled above)
+  keyGenerator: (request) => {
+    return request.ip;
+  },
+  // Custom error message
+  errorResponseBuilder: (_request, context) => {
+    return {
+      error: 'Too Many Requests',
+      message: `Rate limit exceeded. Try again in ${Math.ceil(context.ttl / 1000)} seconds.`,
+      retryAfter: Math.ceil(context.ttl / 1000),
+    };
   },
 });
 

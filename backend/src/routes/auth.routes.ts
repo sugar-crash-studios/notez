@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import * as authService from '../services/auth.service.js';
 import { authenticateToken } from '../middleware/auth.middleware.js';
 import { validateBody } from '../middleware/validate.middleware.js';
@@ -10,6 +10,28 @@ import {
   resetPasswordSchema,
 } from '../utils/validation.schemas.js';
 import { prisma } from '../lib/db.js';
+
+// Rate limit configuration for auth endpoints
+// These are stricter than the global rate limit to prevent brute force attacks
+const authRateLimitConfig = {
+  max: 5, // 5 attempts
+  timeWindow: '15 minutes', // per 15 minutes
+  // Use IP + attempted username/email as key for login-related endpoints
+  keyGenerator: (request: FastifyRequest) => {
+    const body = request.body as { username?: string; email?: string } | undefined;
+    const identifier = body?.username || body?.email || '';
+    return `${request.ip}:${identifier}`;
+  },
+};
+
+// Stricter rate limit for password reset (prevent email enumeration timing attacks)
+const passwordResetRateLimitConfig = {
+  max: 3, // 3 attempts
+  timeWindow: '15 minutes', // per 15 minutes
+  keyGenerator: (request: FastifyRequest) => {
+    return request.ip;
+  },
+};
 
 export async function authRoutes(fastify: FastifyInstance) {
   // Check if setup is needed
@@ -75,6 +97,9 @@ export async function authRoutes(fastify: FastifyInstance) {
   fastify.post(
     '/auth/login',
     {
+      config: {
+        rateLimit: authRateLimitConfig,
+      },
       preHandler: validateBody(loginSchema),
     },
     async (request, reply) => {
@@ -309,6 +334,9 @@ export async function authRoutes(fastify: FastifyInstance) {
   fastify.post(
     '/auth/forgot-password',
     {
+      config: {
+        rateLimit: passwordResetRateLimitConfig,
+      },
       preHandler: validateBody(forgotPasswordSchema),
     },
     async (request, _reply) => {
@@ -335,6 +363,9 @@ export async function authRoutes(fastify: FastifyInstance) {
   fastify.post(
     '/auth/reset-password',
     {
+      config: {
+        rateLimit: passwordResetRateLimitConfig,
+      },
       preHandler: validateBody(resetPasswordSchema),
     },
     async (request, reply) => {

@@ -272,13 +272,20 @@ export async function changePassword(userId: string, data: ChangePasswordInput) 
   const newPasswordHash = await hashPassword(data.newPassword);
 
   // Update password and clear mustChangePassword flag
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      passwordHash: newPasswordHash,
-      mustChangePassword: false,
-    },
-  });
+  // Also invalidate all sessions for security (in case current password was compromised)
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash: newPasswordHash,
+        mustChangePassword: false,
+      },
+    }),
+    // Invalidate all existing sessions - user will need to log in again
+    prisma.session.deleteMany({
+      where: { userId },
+    }),
+  ]);
 }
 
 /**
