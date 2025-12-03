@@ -27,7 +27,7 @@ const authRateLimitConfig = {
 // Stricter rate limit for password reset (prevent email enumeration timing attacks)
 const passwordResetRateLimitConfig = {
   max: 3, // 3 attempts
-  timeWindow: '15 minutes', // per 15 minutes
+  timeWindow: '1 hour', // per hour - stricter for password reset
   keyGenerator: (request: FastifyRequest) => {
     return request.ip;
   },

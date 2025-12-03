@@ -3,8 +3,8 @@ import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import jwt from '@fastify/jwt';
 import multipart from '@fastify/multipart';
-import fastifyStatic from '@fastify/static';
 import rateLimit from '@fastify/rate-limit';
+import fastifyStatic from '@fastify/static';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import 'dotenv/config';
@@ -33,6 +33,19 @@ if (!process.env.DATABASE_URL) {
     process.exit(1);
   }
 }
+
+// Production environment validation - fail fast if critical config is missing
+const isProduction = process.env.NODE_ENV === 'production';
+
+if (isProduction) {
+  if (!process.env.CORS_ORIGIN) {
+    throw new Error('CORS_ORIGIN must be set in production environment');
+  }
+  if (!process.env.COOKIE_SECRET && !process.env.JWT_REFRESH_SECRET) {
+    throw new Error('COOKIE_SECRET or JWT_REFRESH_SECRET must be set in production environment');
+  }
+}
+
 const fastify = Fastify({
   logger: {
     level: process.env.LOG_LEVEL || 'info',
@@ -63,6 +76,7 @@ await fastify.register(jwt, {
 await fastify.register(multipart, {
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB max file size
+    files: 1, // Only allow 1 file per request
   },
 });
 
@@ -86,6 +100,19 @@ await fastify.register(rateLimit, {
       retryAfter: Math.ceil(context.ttl / 1000),
     };
   },
+});
+
+// Global security headers
+fastify.addHook('onSend', async (_request, reply, payload) => {
+  // Prevent clickjacking
+  reply.header('X-Frame-Options', 'DENY');
+  // Prevent MIME type sniffing
+  reply.header('X-Content-Type-Options', 'nosniff');
+  // Control referrer information
+  reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+  // Remove powered-by header
+  reply.removeHeader('X-Powered-By');
+  return payload;
 });
 
 // Health check endpoint

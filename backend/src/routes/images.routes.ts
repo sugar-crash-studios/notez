@@ -1,8 +1,9 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
+import crypto from 'crypto';
 import { authenticateToken, optionalAuth } from '../middleware/auth.middleware.js';
 import { storageService } from '../services/storage.service.js';
 import { prisma } from '../lib/db.js';
-import { validateImageContent, ALLOWED_IMAGE_MIME_TYPES } from '../utils/image.utils.js';
+import { validateImageContent, sanitizeFilename, ALLOWED_IMAGE_MIME_TYPES } from '../utils/image.utils.js';
 
 // Max file size: 10MB
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -11,12 +12,25 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const MAX_LIMIT = 100;
 const DEFAULT_LIMIT = 50;
 
+// Rate limit config for uploads - stricter limits for CPU-intensive operations
+const uploadRateLimitConfig = {
+  max: 10, // 10 uploads per 5 minutes
+  timeWindow: '5 minutes',
+  keyGenerator: (request: FastifyRequest) => {
+    // Rate limit by user ID when authenticated
+    return request.user?.userId || request.ip;
+  },
+};
+
 export async function imagesRoutes(fastify: FastifyInstance) {
-  // Upload image (requires authentication)
+  // Upload image (requires authentication + rate limiting)
   fastify.post(
     '/images/upload',
     {
       preHandler: authenticateToken,
+      config: {
+        rateLimit: uploadRateLimitConfig,
+      },
     },
     async (request, reply) => {
       try {
@@ -42,10 +56,19 @@ export async function imagesRoutes(fastify: FastifyInstance) {
         // Read file buffer
         const buffer = await data.toBuffer();
 
-        // Validate file size
+        // Check if stream was truncated due to fileSize limit (pre-buffer rejection)
+        // This prevents memory exhaustion from large uploads - the limit is enforced at stream level
+        if (data.file.truncated) {
+          return reply.status(413).send({
+            error: 'Payload Too Large',
+            message: `File too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024}MB`,
+          });
+        }
+
+        // Secondary size check (defense in depth)
         if (buffer.length > MAX_FILE_SIZE) {
-          return reply.status(400).send({
-            error: 'Bad Request',
+          return reply.status(413).send({
+            error: 'Payload Too Large',
             message: `File too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024}MB`,
           });
         }
@@ -62,12 +85,15 @@ export async function imagesRoutes(fastify: FastifyInstance) {
         // Upload to storage
         const result = await storageService.uploadImage(buffer, data.mimetype, userId);
 
+        // Sanitize filename for safe storage
+        const safeFilename = sanitizeFilename(data.filename, `image-${result.id}`);
+
         // Save metadata to database
         const image = await prisma.image.create({
           data: {
             id: result.id,
             userId,
-            filename: data.filename || `image-${result.id}`,
+            filename: safeFilename,
             mimeType: data.mimetype,
             size: result.size,
             width: result.width,
@@ -124,11 +150,21 @@ export async function imagesRoutes(fastify: FastifyInstance) {
           });
         }
 
+        // Generate ETag from content hash for conditional requests
+        const etag = `"${crypto.createHash('md5').update(result.buffer).digest('hex')}"`;
+
+        // Check If-None-Match header for conditional GET
+        const ifNoneMatch = request.headers['if-none-match'];
+        if (ifNoneMatch === etag) {
+          return reply.status(304).send();
+        }
+
         // Set proper headers
         // Use private caching - images are user content and URLs should not be shared publicly
         reply.header('Content-Type', result.mimeType);
         reply.header('Cache-Control', 'private, max-age=31536000, immutable');
         reply.header('Content-Length', result.buffer.length);
+        reply.header('ETag', etag);
         reply.header('X-Content-Type-Options', 'nosniff');
 
         return reply.send(result.buffer);

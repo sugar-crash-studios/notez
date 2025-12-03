@@ -218,7 +218,9 @@ class StorageService {
     const client = this.getClient();
 
     // Process avatar - resize to 256x256 square, convert to JPEG
+    // .rotate() without arguments auto-orients based on EXIF and strips metadata (privacy)
     const processed = await sharp(buffer)
+      .rotate() // Auto-orient and strip EXIF metadata for privacy
       .resize(256, 256, { fit: 'cover' })
       .jpeg({ quality: 90 })
       .toBuffer();

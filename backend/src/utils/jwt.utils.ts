@@ -11,6 +11,17 @@ export interface TokenPair {
   refreshToken: string;
 }
 
+// In production, require explicit secrets - no defaults allowed
+const isProduction = process.env.NODE_ENV === 'production';
+
+if (isProduction && !process.env.JWT_ACCESS_SECRET) {
+  throw new Error('JWT_ACCESS_SECRET must be set in production environment');
+}
+
+if (isProduction && !process.env.JWT_REFRESH_SECRET) {
+  throw new Error('JWT_REFRESH_SECRET must be set in production environment');
+}
+
 const ACCESS_TOKEN_SECRET = process.env.JWT_ACCESS_SECRET || 'change-me-in-production';
 const REFRESH_TOKEN_SECRET = process.env.JWT_REFRESH_SECRET || 'change-me-in-production';
 

@@ -1,10 +1,20 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
+import crypto from 'crypto';
 import { authenticateToken } from '../middleware/auth.middleware.js';
 import { storageService } from '../services/storage.service.js';
 import { prisma } from '../lib/db.js';
 import { validateImageContent, ALLOWED_IMAGE_MIME_TYPES } from '../utils/image.utils.js';
 
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024; // 5MB
+
+// Rate limit config for avatar uploads
+const avatarUploadRateLimitConfig = {
+  max: 5, // 5 avatar uploads per 5 minutes
+  timeWindow: '5 minutes',
+  keyGenerator: (request: FastifyRequest) => {
+    return request.user?.userId || request.ip;
+  },
+};
 
 /**
  * Public profile routes (no authentication required)
@@ -28,8 +38,18 @@ export async function profilePublicRoutes(fastify: FastifyInstance) {
         });
       }
 
+      // Generate ETag from content hash for conditional requests
+      const etag = `"${crypto.createHash('md5').update(avatar.buffer).digest('hex')}"`;
+
+      // Check If-None-Match header for conditional GET
+      const ifNoneMatch = request.headers['if-none-match'];
+      if (ifNoneMatch === etag) {
+        return reply.status(304).send();
+      }
+
       reply.header('Content-Type', avatar.mimeType);
       reply.header('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+      reply.header('ETag', etag);
       reply.header('X-Content-Type-Options', 'nosniff');
 
       return reply.send(avatar.buffer);
@@ -105,74 +125,90 @@ export async function profileRoutes(fastify: FastifyInstance) {
 
   /**
    * POST /api/profile/avatar
-   * Upload user avatar
+   * Upload user avatar (with rate limiting)
    */
-  fastify.post('/profile/avatar', async (request, reply) => {
-    try {
-      if (!request.user) {
-        return reply.status(401).send({
-          error: 'Unauthorized',
-          message: 'Authentication required',
+  fastify.post(
+    '/profile/avatar',
+    {
+      config: {
+        rateLimit: avatarUploadRateLimitConfig,
+      },
+    },
+    async (request, reply) => {
+      try {
+        if (!request.user) {
+          return reply.status(401).send({
+            error: 'Unauthorized',
+            message: 'Authentication required',
+          });
+        }
+
+        const data = await request.file();
+        if (!data) {
+          return reply.status(400).send({
+            error: 'Bad Request',
+            message: 'No file uploaded',
+          });
+        }
+
+        // Validate mime type
+        if (!ALLOWED_IMAGE_MIME_TYPES.includes(data.mimetype)) {
+          return reply.status(400).send({
+            error: 'Bad Request',
+            message: 'Invalid file type. Allowed: JPEG, PNG, GIF, WebP',
+          });
+        }
+
+        // Read file buffer
+        const buffer = await data.toBuffer();
+
+        // Check if stream was truncated due to fileSize limit (pre-buffer rejection)
+        if (data.file.truncated) {
+          return reply.status(413).send({
+            error: 'Payload Too Large',
+            message: 'File too large. Maximum size is 5MB',
+          });
+        }
+
+        // Secondary size check (defense in depth)
+        if (buffer.length > MAX_AVATAR_SIZE) {
+          return reply.status(413).send({
+            error: 'Payload Too Large',
+            message: 'File too large. Maximum size is 5MB',
+          });
+        }
+
+        // Validate actual image content (prevents content-type spoofing)
+        const contentValidation = await validateImageContent(buffer);
+        if (!contentValidation.valid) {
+          return reply.status(400).send({
+            error: 'Bad Request',
+            message: 'Invalid image file. File content does not match a supported image format.',
+          });
+        }
+
+        // Upload avatar
+        const result = await storageService.uploadAvatar(buffer, request.user.userId);
+
+        // Update user record with avatar URL
+        await prisma.user.update({
+          where: { id: request.user.userId },
+          data: { avatarUrl: result.url },
+        });
+
+        return {
+          message: 'Avatar uploaded successfully',
+          avatarUrl: result.url,
+        };
+      } catch (error) {
+        fastify.log.error(error);
+        return reply.status(500).send({
+          error: 'Internal Server Error',
+          message: 'Failed to upload avatar',
         });
       }
-
-      const data = await request.file();
-      if (!data) {
-        return reply.status(400).send({
-          error: 'Bad Request',
-          message: 'No file uploaded',
-        });
-      }
-
-      // Validate mime type
-      if (!ALLOWED_IMAGE_MIME_TYPES.includes(data.mimetype)) {
-        return reply.status(400).send({
-          error: 'Bad Request',
-          message: 'Invalid file type. Allowed: JPEG, PNG, GIF, WebP',
-        });
-      }
-
-      // Read file buffer
-      const buffer = await data.toBuffer();
-
-      // Validate file size
-      if (buffer.length > MAX_AVATAR_SIZE) {
-        return reply.status(400).send({
-          error: 'Bad Request',
-          message: 'File too large. Maximum size is 5MB',
-        });
-      }
-
-      // Validate actual image content (prevents content-type spoofing)
-      const contentValidation = await validateImageContent(buffer);
-      if (!contentValidation.valid) {
-        return reply.status(400).send({
-          error: 'Bad Request',
-          message: 'Invalid image file. File content does not match a supported image format.',
-        });
-      }
-
-      // Upload avatar
-      const result = await storageService.uploadAvatar(buffer, request.user.userId);
-
-      // Update user record with avatar URL
-      await prisma.user.update({
-        where: { id: request.user.userId },
-        data: { avatarUrl: result.url },
-      });
-
-      return {
-        message: 'Avatar uploaded successfully',
-        avatarUrl: result.url,
-      };
-    } catch (error) {
-      fastify.log.error(error);
-      return reply.status(500).send({
-        error: 'Internal Server Error',
-        message: 'Failed to upload avatar',
-      });
     }
-  });
+  );
 
   /**
    * DELETE /api/profile/avatar
