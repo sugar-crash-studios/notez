@@ -2,9 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import { authenticateToken } from '../middleware/auth.middleware.js';
 import { storageService } from '../services/storage.service.js';
 import { prisma } from '../lib/db.js';
+import { validateImageContent, ALLOWED_IMAGE_MIME_TYPES } from '../utils/image.utils.js';
 
-// Allowed image mime types for avatars
-const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024; // 5MB
 
 /**
@@ -31,6 +30,7 @@ export async function profilePublicRoutes(fastify: FastifyInstance) {
 
       reply.header('Content-Type', avatar.mimeType);
       reply.header('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+      reply.header('X-Content-Type-Options', 'nosniff');
 
       return reply.send(avatar.buffer);
     } catch (error) {
@@ -125,7 +125,7 @@ export async function profileRoutes(fastify: FastifyInstance) {
       }
 
       // Validate mime type
-      if (!ALLOWED_MIME_TYPES.includes(data.mimetype)) {
+      if (!ALLOWED_IMAGE_MIME_TYPES.includes(data.mimetype)) {
         return reply.status(400).send({
           error: 'Bad Request',
           message: 'Invalid file type. Allowed: JPEG, PNG, GIF, WebP',
@@ -140,6 +140,15 @@ export async function profileRoutes(fastify: FastifyInstance) {
         return reply.status(400).send({
           error: 'Bad Request',
           message: 'File too large. Maximum size is 5MB',
+        });
+      }
+
+      // Validate actual image content (prevents content-type spoofing)
+      const contentValidation = await validateImageContent(buffer);
+      if (!contentValidation.valid) {
+        return reply.status(400).send({
+          error: 'Bad Request',
+          message: 'Invalid image file. File content does not match a supported image format.',
         });
       }
 

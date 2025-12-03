@@ -1,16 +1,8 @@
 import type { FastifyInstance } from 'fastify';
-import sharp from 'sharp';
 import { authenticateToken, optionalAuth } from '../middleware/auth.middleware.js';
 import { storageService } from '../services/storage.service.js';
 import { prisma } from '../lib/db.js';
-
-// Allowed MIME types
-const ALLOWED_MIME_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/gif',
-];
+import { validateImageContent, ALLOWED_IMAGE_MIME_TYPES } from '../utils/image.utils.js';
 
 // Max file size: 10MB
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -18,40 +10,6 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 // Pagination limits
 const MAX_LIMIT = 100;
 const DEFAULT_LIMIT = 50;
-
-/**
- * Validate image content by actually parsing it with Sharp.
- * This prevents content-type spoofing and validates the file is a real image.
- */
-async function validateImageContent(buffer: Buffer): Promise<{ valid: boolean; detectedFormat?: string }> {
-  try {
-    const metadata = await sharp(buffer).metadata();
-
-    if (!metadata.format) {
-      return { valid: false };
-    }
-
-    // Map sharp format names to MIME types
-    const formatToMime: Record<string, string> = {
-      'jpeg': 'image/jpeg',
-      'png': 'image/png',
-      'webp': 'image/webp',
-      'gif': 'image/gif',
-    };
-
-    const detectedMime = formatToMime[metadata.format];
-
-    // Verify the detected format matches an allowed type
-    if (!detectedMime || !ALLOWED_MIME_TYPES.includes(detectedMime)) {
-      return { valid: false, detectedFormat: metadata.format };
-    }
-
-    return { valid: true, detectedFormat: metadata.format };
-  } catch {
-    // Sharp couldn't parse the file - not a valid image
-    return { valid: false };
-  }
-}
 
 export async function imagesRoutes(fastify: FastifyInstance) {
   // Upload image (requires authentication)
@@ -74,10 +32,10 @@ export async function imagesRoutes(fastify: FastifyInstance) {
         }
 
         // Validate MIME type
-        if (!ALLOWED_MIME_TYPES.includes(data.mimetype)) {
+        if (!ALLOWED_IMAGE_MIME_TYPES.includes(data.mimetype)) {
           return reply.status(400).send({
             error: 'Bad Request',
-            message: `Invalid file type. Allowed types: ${ALLOWED_MIME_TYPES.join(', ')}`,
+            message: `Invalid file type. Allowed types: ${ALLOWED_IMAGE_MIME_TYPES.join(', ')}`,
           });
         }
 
@@ -171,6 +129,7 @@ export async function imagesRoutes(fastify: FastifyInstance) {
         reply.header('Content-Type', result.mimeType);
         reply.header('Cache-Control', 'private, max-age=31536000, immutable');
         reply.header('Content-Length', result.buffer.length);
+        reply.header('X-Content-Type-Options', 'nosniff');
 
         return reply.send(result.buffer);
       } catch (error) {

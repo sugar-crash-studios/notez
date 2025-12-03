@@ -21,12 +21,24 @@ class StorageService {
 
   private getClient(): Client {
     if (!this.client) {
+      // In production, require explicit credentials - no defaults allowed
+      const isProduction = process.env.NODE_ENV === 'production';
+      const accessKey = process.env.MINIO_ACCESS_KEY;
+      const secretKey = process.env.MINIO_SECRET_KEY;
+
+      if (isProduction && (!accessKey || !secretKey)) {
+        throw new Error(
+          'MINIO_ACCESS_KEY and MINIO_SECRET_KEY must be set in production environment'
+        );
+      }
+
       this.client = new Client({
         endPoint: process.env.MINIO_ENDPOINT || 'localhost',
         port: parseInt(process.env.MINIO_PORT || '9000', 10),
         useSSL: process.env.MINIO_USE_SSL === 'true',
-        accessKey: process.env.MINIO_ACCESS_KEY || 'notez',
-        secretKey: process.env.MINIO_SECRET_KEY || 'notez-secret',
+        // Use provided credentials or development defaults
+        accessKey: accessKey || 'notez',
+        secretKey: secretKey || 'notez-secret',
       });
     }
     return this.client;
