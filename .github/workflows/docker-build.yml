@@ -1,5 +1,4 @@
 name: Build and Push Docker Image
-
 on:
   push:
     branches:
@@ -9,25 +8,20 @@ on:
   pull_request:
     branches:
       - main
-
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
       - name: Log in to Container Registry
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
@@ -35,7 +29,6 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Extract metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@v5
@@ -48,7 +41,6 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
-
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -59,6 +51,27 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
-
       - name: Output image tags
         run: echo "Image tags - ${{ steps.meta.outputs.tags }}"
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: self-hosted
+    steps:
+      - name: Deploy to Komodo
+        env:
+          KOMODO_API_KEY: ${{ secrets.KOMODO_API_KEY }}
+          KOMODO_API_SECRET: ${{ secrets.KOMODO_API_SECRET }}
+        run: |
+          set -euo pipefail
+          response=$(curl -s -w "%{http_code}" -o /tmp/deploy_response.json -X POST "https://komo.local.cogg.haus/execute" \
+            -H "X-API-KEY: $KOMODO_API_KEY" \
+            -H "X-API-SECRET: $KOMODO_API_SECRET" \
+            -H "Content-Type: application/json" \
+            -d '{"type": "DeployStack", "params": {"stack": "notez"}}')
+          echo "Deployment HTTP status: $response"
+          if [ "$response" -lt 200 ] || [ "$response" -ge 300 ]; then
+            echo "Deployment failed with status: $response"
+            exit 1
+          fi
