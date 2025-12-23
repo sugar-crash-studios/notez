@@ -60,9 +60,12 @@ jobs:
     runs-on: self-hosted
     steps:
       - name: Deploy to Komodo
+        env:
+          KOMODO_API_KEY: ${{ secrets.KOMODO_API_KEY }}
+          KOMODO_API_SECRET: ${{ secrets.KOMODO_API_SECRET }}
         run: |
           curl -sf -X POST "https://komo.local.cogg.haus/execute" \
-            -H "X-API-KEY: ${{ secrets.KOMODO_API_KEY }}" \
-            -H "X-API-SECRET: ${{ secrets.KOMODO_API_SECRET }}" \
+            -H "X-API-KEY: $KOMODO_API_KEY" \
+            -H "X-API-SECRET: $KOMODO_API_SECRET" \
             -H "Content-Type: application/json" \
             -d '{"type": "DeployStack", "params": {"stack": "notez"}}'
