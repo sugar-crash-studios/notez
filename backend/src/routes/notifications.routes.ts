@@ -166,4 +166,53 @@ export async function notificationsRoutes(fastify: FastifyInstance) {
       }
     }
   );
+
+  /**
+   * Send new release notification to all users (admin only)
+   * POST /api/admin/notifications/release
+   */
+  fastify.post(
+    '/admin/notifications/release',
+    async (request, reply) => {
+      try {
+        // Check if user is admin
+        if (request.user!.role !== 'admin') {
+          return reply.status(403).send({
+            error: 'Forbidden',
+            message: 'Admin access required',
+          });
+        }
+
+        const body = request.body as { version: string; highlights?: string };
+
+        if (!body.version) {
+          return reply.status(400).send({
+            error: 'Bad Request',
+            message: 'Version is required',
+          });
+        }
+
+        const highlights = body.highlights || 'Check out the latest features and improvements!';
+
+        const result = await notificationService.notifyAllUsers(
+          'NEW_RELEASE',
+          `🎉 Notez ${body.version} is here!`,
+          'release',
+          body.version,
+          highlights
+        );
+
+        return {
+          message: 'Release notification sent',
+          count: result.count,
+        };
+      } catch (error) {
+        fastify.log.error(error);
+        return reply.status(500).send({
+          error: 'Internal Server Error',
+          message: 'Failed to send release notification',
+        });
+      }
+    }
+  );
 }

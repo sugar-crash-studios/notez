@@ -203,6 +203,31 @@ export async function updateFeedback(feedbackId: string, input: UpdateFeedbackIn
     },
   });
 
+  // Notify user if status changed (and it's a meaningful status change)
+  if (input.status !== undefined && input.status !== existing.status) {
+    const statusMessages: Record<string, string> = {
+      REVIEWED: 'Your feedback has been reviewed by our team',
+      APPROVED: 'Great news! Your feedback has been approved',
+      DECLINED: 'Your feedback has been reviewed',
+      PUBLISHED: 'Your feedback has been published',
+    };
+
+    const message = statusMessages[input.status];
+    if (message) {
+      const typeLabel = feedback.type === 'BUG' ? 'bug report' : 'feature request';
+      notificationService.notifyUser(
+        feedback.userId,
+        'FEEDBACK_STATUS_CHANGE',
+        `${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)} update: ${feedback.title}`,
+        'feedback',
+        feedback.id,
+        message
+      ).catch(err => {
+        console.error('Failed to notify user of status change:', err);
+      });
+    }
+  }
+
   return feedback;
 }
 

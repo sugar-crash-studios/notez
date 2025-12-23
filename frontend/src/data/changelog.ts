@@ -12,6 +12,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '1.0.1',
+    date: '2025-12-23',
+    added: [
+      'User Notifications: Get notified when your feedback status changes (reviewed, approved, etc.)',
+      'Release Notifications: All users receive notifications about new app versions',
+    ],
+    changed: [
+      'Notification Bell: Now visible for all users (not just admins)',
+    ],
+  },
+  {
     version: '1.0.0',
     date: '2025-12-22',
     added: [
