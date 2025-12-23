@@ -64,8 +64,13 @@ jobs:
           KOMODO_API_KEY: ${{ secrets.KOMODO_API_KEY }}
           KOMODO_API_SECRET: ${{ secrets.KOMODO_API_SECRET }}
         run: |
-          curl -sf -X POST "https://komo.local.cogg.haus/execute" \
-            -H "X-API-KEY: $KOMODO_API_KEY" \
-            -H "X-API-SECRET: $KOMODO_API_SECRET" \
-            -H "Content-Type: application/json" \
-            -d '{"type": "DeployStack", "params": {"stack": "notez"}}'
+          run: |
+            response=$(curl -s -w "%{http_code}" -o /tmp/deploy_response.json -X POST "https://komo.local.cogg.haus/execute" \
+              -H "Content-Type: application/json" \
+              -d '{"type": "DeployStack", "params": {"stack": "notez"}}')
+            echo "Deployment HTTP status: $response"
+            if [ "$response" -lt 200 ] || [ "$response" -ge 300 ]; then
+              echo "Deployment failed, response body:"
+              cat /tmp/deploy_response.json
+              exit 1
+            fi
