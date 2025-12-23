@@ -242,3 +242,32 @@ export type ScanTasksInput = z.infer<typeof scanTasksSchema>;
 export type ImportTasksInput = z.infer<typeof importTasksSchema>;
 export type RenameTagInput = z.infer<typeof renameTagSchema>;
 export type TagSearchQuery = z.infer<typeof tagSearchQuerySchema>;
+
+// Feedback schemas
+export const FEEDBACK_CATEGORIES = ['ui', 'editor', 'ai', 'organization', 'other'] as const;
+export const FEEDBACK_PRIORITIES = ['nice-to-have', 'helpful', 'critical'] as const;
+
+export const createFeedbackSchema = z.object({
+  type: z.enum(['BUG', 'FEATURE']),
+  title: z.string().min(1, 'Title is required').max(100, 'Title must not exceed 100 characters'),
+  description: z.string().min(1, 'Description is required').max(1000, 'Description must not exceed 1000 characters'),
+  category: z.enum(FEEDBACK_CATEGORIES).optional(),
+  priority: z.enum(FEEDBACK_PRIORITIES).optional(),
+});
+
+export const updateFeedbackSchema = z.object({
+  status: z.enum(['NEW', 'REVIEWED', 'APPROVED', 'PUBLISHED', 'DECLINED']).optional(),
+  adminNotes: z.string().max(5000).optional(),
+});
+
+export const listFeedbackQuerySchema = z.object({
+  type: z.enum(['BUG', 'FEATURE']).optional(),
+  status: z.enum(['NEW', 'REVIEWED', 'APPROVED', 'PUBLISHED', 'DECLINED']).optional(),
+  category: z.enum(FEEDBACK_CATEGORIES).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export type CreateFeedbackInput = z.infer<typeof createFeedbackSchema>;
+export type UpdateFeedbackInput = z.infer<typeof updateFeedbackSchema>;
+export type ListFeedbackQuery = z.infer<typeof listFeedbackQuerySchema>;

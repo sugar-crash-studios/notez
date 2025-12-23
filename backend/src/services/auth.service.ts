@@ -182,8 +182,8 @@ export async function refreshAccessToken(refreshToken: string) {
 
   // Check if session is expired
   if (session.expiresAt < new Date()) {
-    // Delete expired session
-    await prisma.session.delete({ where: { id: session.id } });
+    // Delete expired session (use deleteMany to avoid race condition errors)
+    await prisma.session.deleteMany({ where: { id: session.id } });
     throw new Error('Refresh token expired');
   }
 
@@ -200,11 +200,13 @@ export async function refreshAccessToken(refreshToken: string) {
   });
 
   // Delete old session and create new one atomically (prevents token reuse)
+  // Use deleteMany instead of delete to handle race conditions where
+  // multiple tabs/requests try to refresh the same token simultaneously
   const newExpiresAt = new Date();
   newExpiresAt.setDate(newExpiresAt.getDate() + 7);
 
   await prisma.$transaction([
-    prisma.session.delete({
+    prisma.session.deleteMany({
       where: { id: session.id },
     }),
     prisma.session.create({

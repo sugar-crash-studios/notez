@@ -235,6 +235,20 @@ export const profileApi = {
   getAvatarUrl: (userId: string) => `/api/profile/avatar/${userId}`,
 };
 
+export const referencesApi = {
+  // Find all notes containing a wiki-link to the given keyword
+  findByKeyword: (keyword: string, params?: { limit?: number; offset?: number }) =>
+    api.get('/api/notes/references', { params: { keyword, ...params } }),
+
+  // Get backlinks for a specific note (notes that link TO this note)
+  getBacklinks: (noteId: string) =>
+    api.get(`/api/notes/${noteId}/backlinks`),
+
+  // Get all unique keywords used in wiki-links (for autocomplete)
+  getKeywords: () =>
+    api.get('/api/notes/keywords'),
+};
+
 export const tasksApi = {
   list: (params?: {
     status?: string | string[];
@@ -293,4 +307,94 @@ export const tasksApi = {
     folderId?: string | null;
   }> }) =>
     api.post('/api/tasks/import', data),
+};
+
+// Feedback types
+export type FeedbackType = 'BUG' | 'FEATURE';
+export type FeedbackStatus = 'NEW' | 'REVIEWED' | 'APPROVED' | 'PUBLISHED' | 'DECLINED';
+export type FeedbackCategory = 'ui' | 'editor' | 'ai' | 'organization' | 'other';
+export type FeedbackPriority = 'nice-to-have' | 'helpful' | 'critical';
+
+export interface FeedbackSubmission {
+  id: string;
+  type: FeedbackType;
+  title: string;
+  description: string;
+  category?: FeedbackCategory;
+  priority?: FeedbackPriority;
+  status: FeedbackStatus;
+  adminNotes?: string;
+  githubIssueUrl?: string;
+  githubIssueNumber?: number;
+  shipped: boolean;
+  shippedAt?: string;
+  userId: string;
+  user?: { id: string; username: string; email?: string };
+  createdAt: string;
+  updatedAt: string;
+  reviewedAt?: string;
+  publishedAt?: string;
+}
+
+export const feedbackApi = {
+  // User endpoints
+  submit: (data: {
+    type: FeedbackType;
+    title: string;
+    description: string;
+    category?: FeedbackCategory;
+    priority?: FeedbackPriority;
+  }) => api.post('/api/feedback', data),
+
+  getMine: (params?: { limit?: number; offset?: number }) =>
+    api.get('/api/feedback/mine', { params }),
+
+  getById: (id: string) => api.get(`/api/feedback/${id}`),
+
+  // Admin endpoints
+  listAll: (params?: {
+    type?: FeedbackType;
+    status?: FeedbackStatus;
+    category?: FeedbackCategory;
+    limit?: number;
+    offset?: number;
+  }) => api.get('/api/admin/feedback', { params }),
+
+  getByIdAdmin: (id: string) => api.get(`/api/admin/feedback/${id}`),
+
+  update: (id: string, data: { status?: FeedbackStatus; adminNotes?: string }) =>
+    api.patch(`/api/admin/feedback/${id}`, data),
+
+  delete: (id: string) => api.delete(`/api/admin/feedback/${id}`),
+
+  markShipped: (id: string) => api.post(`/api/admin/feedback/${id}/ship`),
+
+  unmarkShipped: (id: string) => api.delete(`/api/admin/feedback/${id}/ship`),
+
+  getStats: () => api.get('/api/admin/feedback/stats'),
+};
+
+export interface Notification {
+  id: string;
+  type: string;
+  title: string;
+  message?: string;
+  isRead: boolean;
+  linkType: string;
+  linkId: string;
+  createdAt: string;
+  readAt?: string;
+}
+
+export const notificationsApi = {
+  list: (params?: { limit?: number; offset?: number; unreadOnly?: boolean }) =>
+    api.get('/api/notifications', { params }),
+
+  getUnreadCount: () => api.get('/api/notifications/unread-count'),
+
+  markAsRead: (id: string) => api.patch(`/api/notifications/${id}/read`),
+
+  markAllAsRead: () => api.post('/api/notifications/mark-all-read'),
+
+  delete: (id: string) => api.delete(`/api/notifications/${id}`),
 };

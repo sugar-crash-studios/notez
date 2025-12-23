@@ -10,6 +10,8 @@ import TurndownService from 'turndown';
 import { gfm } from 'turndown-plugin-gfm';
 import { marked } from 'marked';
 import { ImageUploadExtension } from './TiptapImageExtension';
+import { WikiLink } from './WikiLinkExtension';
+import { ReferencesPanel } from './ReferencesPanel';
 import { uploadImage } from '../api/images';
 import { ImagePlus } from 'lucide-react';
 import './TiptapEditor.css';
@@ -19,6 +21,7 @@ interface TiptapEditorProps {
   onChange: (content: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  onNoteNavigate?: (noteId: string) => void;
 }
 
 // Initialize turndown service for HTML to Markdown conversion
@@ -71,6 +74,17 @@ turndownService.addRule('taskListItems', {
 // This comes AFTER our custom rule so our rule takes priority
 turndownService.use(gfm);
 
+// Custom rule for wiki-links (preserve [[keyword]] syntax)
+turndownService.addRule('wikiLinks', {
+  filter: (node) => {
+    return node.nodeName === 'SPAN' && node.hasAttribute('data-wiki-link');
+  },
+  replacement: (_content, node: any) => {
+    const keyword = node.getAttribute('data-keyword') || node.textContent || '';
+    return `[[${keyword}]]`;
+  },
+});
+
 // Custom rule for images (including width for resized images)
 turndownService.addRule('images', {
   filter: 'img',
@@ -96,7 +110,7 @@ turndownService.addRule('images', {
   },
 });
 
-// Configure marked to handle task lists
+// Configure marked to handle task lists and wiki-links
 marked.use({
   gfm: true,
   breaks: true,
@@ -120,6 +134,33 @@ marked.use({
       },
       renderer(token: any) {
         return `<li data-type="taskItem" data-checked="${token.checked}"><label><input type="checkbox" ${token.checked ? 'checked' : ''}><span></span></label><div><p>${token.text}</p></div></li>`;
+      },
+    },
+    {
+      name: 'wikiLink',
+      level: 'inline',
+      start(src: string) {
+        return src.match(/\[\[/)?.index;
+      },
+      tokenizer(src: string) {
+        const match = /^\[\[([^\]]+)\]\]/.exec(src);
+        if (match) {
+          return {
+            type: 'wikiLink',
+            raw: match[0],
+            keyword: match[1].trim(),
+          };
+        }
+      },
+      renderer(token: any) {
+        // Escape HTML entities to prevent XSS
+        const escapedKeyword = token.keyword
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+        return `<span data-wiki-link="true" data-keyword="${escapedKeyword}" class="wiki-link">${escapedKeyword}</span>`;
       },
     },
   ],
@@ -194,10 +235,23 @@ function markdownToHTML(markdown: string): string {
   }
 }
 
-export function TiptapEditor({ content, onChange, disabled = false, placeholder = 'Start writing...' }: TiptapEditorProps) {
+export function TiptapEditor({ content, onChange, disabled = false, placeholder = 'Start writing...', onNoteNavigate }: TiptapEditorProps) {
   const isUpdatingFromProp = useRef(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [referencesKeyword, setReferencesKeyword] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Handle wiki-link clicks
+  const handleWikiLinkClick = useCallback((keyword: string) => {
+    setReferencesKeyword(keyword);
+  }, []);
+
+  // Handle note navigation from references panel
+  const handleNoteClick = useCallback((noteId: string) => {
+    if (onNoteNavigate) {
+      onNoteNavigate(noteId);
+    }
+  }, [onNoteNavigate]);
 
   // Handle image upload
   const handleImageUpload = useCallback(async (file: File): Promise<string | null> => {
@@ -249,6 +303,9 @@ export function TiptapEditor({ content, onChange, disabled = false, placeholder 
         onError: (error) => {
           console.error('Image upload error:', error);
         },
+      }),
+      WikiLink.configure({
+        onWikiLinkClick: handleWikiLinkClick,
       }),
     ],
     content: markdownToHTML(content),
@@ -384,6 +441,15 @@ export function TiptapEditor({ content, onChange, disabled = false, placeholder 
           </svg>
           Uploading image...
         </div>
+      )}
+
+      {/* References Panel for wiki-link lookups */}
+      {referencesKeyword && (
+        <ReferencesPanel
+          keyword={referencesKeyword}
+          onClose={() => setReferencesKeyword(null)}
+          onNoteClick={handleNoteClick}
+        />
       )}
     </div>
   );

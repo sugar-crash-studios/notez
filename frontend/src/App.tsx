@@ -47,8 +47,9 @@ function AppRoutes() {
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/change-password" element={<ChangePasswordPage />} />
+      {/* Settings routes with nested section parameter */}
       <Route
-        path="/settings"
+        path="/settings/:section?"
         element={
           <ProtectedRoute>
             <SettingsHub />
@@ -56,8 +57,8 @@ function AppRoutes() {
         }
       />
       {/* Legacy routes redirect to settings hub with appropriate section */}
-      <Route path="/profile" element={<Navigate to="/settings#profile" replace />} />
-      <Route path="/admin" element={<Navigate to="/settings#admin" replace />} />
+      <Route path="/profile" element={<Navigate to="/settings/profile" replace />} />
+      <Route path="/admin" element={<Navigate to="/settings/admin" replace />} />
       <Route
         path="/"
         element={

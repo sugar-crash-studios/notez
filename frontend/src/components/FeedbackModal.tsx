@@ -1,0 +1,294 @@
+import { useState, useEffect, useRef } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { X, Bug, Lightbulb, Send, CheckCircle, AlertCircle } from 'lucide-react';
+import { feedbackApi, type FeedbackType, type FeedbackCategory, type FeedbackPriority } from '../lib/api';
+
+interface FeedbackModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+const CATEGORIES: { value: FeedbackCategory; label: string }[] = [
+  { value: 'ui', label: 'User Interface' },
+  { value: 'editor', label: 'Note Editor' },
+  { value: 'ai', label: 'AI Features' },
+  { value: 'organization', label: 'Organization' },
+  { value: 'other', label: 'Other' },
+];
+
+const PRIORITIES: { value: FeedbackPriority; label: string; description: string }[] = [
+  { value: 'nice-to-have', label: 'Nice to Have', description: 'Would be cool someday' },
+  { value: 'helpful', label: 'Helpful', description: 'Would improve my workflow' },
+  { value: 'critical', label: 'Critical', description: 'Really need this!' },
+];
+
+export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
+  const [type, setType] = useState<FeedbackType>('FEATURE');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [category, setCategory] = useState<FeedbackCategory | ''>('');
+  const [priority, setPriority] = useState<FeedbackPriority | ''>('');
+  const [showSuccess, setShowSuccess] = useState(false);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup timer on unmount to prevent memory leak
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current);
+      }
+    };
+  }, []);
+
+  const submitMutation = useMutation({
+    mutationFn: () =>
+      feedbackApi.submit({
+        type,
+        title,
+        description,
+        category: category || undefined,
+        priority: priority || undefined,
+      }),
+    onSuccess: () => {
+      setShowSuccess(true);
+      // Reset form after short delay (with cleanup)
+      closeTimerRef.current = setTimeout(() => {
+        resetForm();
+        onClose();
+      }, 2000);
+    },
+  });
+
+  const resetForm = () => {
+    setType('FEATURE');
+    setTitle('');
+    setDescription('');
+    setCategory('');
+    setPriority('');
+    setShowSuccess(false);
+    submitMutation.reset();
+  };
+
+  const handleClose = () => {
+    if (!submitMutation.isPending) {
+      resetForm();
+      onClose();
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (title.trim() && description.trim()) {
+      submitMutation.mutate();
+    }
+  };
+
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget && !submitMutation.isPending) {
+      handleClose();
+    }
+  };
+
+  if (!isOpen) return null;
+
+  const isBug = type === 'BUG';
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={handleBackdropClick}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="feedback-title"
+    >
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        {showSuccess ? (
+          // Success State
+          <div className="p-8 text-center">
+            <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mb-4">
+              <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              Thanks for your feedback!
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400">
+              We&apos;ve received your {isBug ? 'bug report' : 'suggestion'} and will review it soon.
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <div>
+                <h2 id="feedback-title" className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Share Your Feedback
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Help us make Notez better for you
+                </p>
+              </div>
+              <button
+                onClick={handleClose}
+                disabled={submitMutation.isPending}
+                className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Type Toggle */}
+            <div className="p-4 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setType('BUG')}
+                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-all ${
+                    isBug
+                      ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 ring-2 ring-red-500'
+                      : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <Bug className="w-5 h-5" />
+                  <span>Report a Problem</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setType('FEATURE')}
+                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-all ${
+                    !isBug
+                      ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 ring-2 ring-amber-500'
+                      : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <Lightbulb className="w-5 h-5" />
+                  <span>Suggest Something</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="p-4 space-y-4">
+              {/* Title */}
+              <div>
+                <label htmlFor="feedback-title-input" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {isBug ? 'What went wrong?' : 'What would help?'}
+                </label>
+                <input
+                  id="feedback-title-input"
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  maxLength={100}
+                  placeholder={isBug ? 'e.g., Editor crashes when pasting images' : 'e.g., Add dark mode scheduling'}
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                  disabled={submitMutation.isPending}
+                />
+                <div className="text-xs text-gray-500 dark:text-gray-400 text-right mt-1">
+                  {title.length}/100
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label htmlFor="feedback-description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {isBug ? 'Tell us more about the issue' : 'Describe your idea'}
+                </label>
+                <textarea
+                  id="feedback-description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  maxLength={1000}
+                  rows={4}
+                  placeholder={
+                    isBug
+                      ? 'What were you doing when it happened? What did you expect to happen?'
+                      : 'How would this feature help you? What problem would it solve?'
+                  }
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  required
+                  disabled={submitMutation.isPending}
+                />
+                <div className="text-xs text-gray-500 dark:text-gray-400 text-right mt-1">
+                  {description.length}/1000
+                </div>
+              </div>
+
+              {/* Category & Priority Row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="feedback-category" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Category (optional)
+                  </label>
+                  <select
+                    id="feedback-category"
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value as FeedbackCategory)}
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={submitMutation.isPending}
+                  >
+                    <option value="">Select...</option>
+                    {CATEGORIES.map((cat) => (
+                      <option key={cat.value} value={cat.value}>
+                        {cat.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="feedback-priority" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    {isBug ? 'Severity' : 'Priority'} (optional)
+                  </label>
+                  <select
+                    id="feedback-priority"
+                    value={priority}
+                    onChange={(e) => setPriority(e.target.value as FeedbackPriority)}
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={submitMutation.isPending}
+                  >
+                    <option value="">Select...</option>
+                    {PRIORITIES.map((pri) => (
+                      <option key={pri.value} value={pri.value}>
+                        {pri.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Error Message */}
+              {submitMutation.isError && (
+                <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-300 text-sm">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>
+                    {(submitMutation.error as any)?.response?.data?.message || 'Something went wrong. Please try again.'}
+                  </span>
+                </div>
+              )}
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={!title.trim() || !description.trim() || submitMutation.isPending}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-lg transition-colors"
+              >
+                {submitMutation.isPending ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Sending...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-5 h-5" />
+                    <span>Send Feedback</span>
+                  </>
+                )}
+              </button>
+            </form>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

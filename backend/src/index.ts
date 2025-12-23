@@ -19,6 +19,9 @@ import { aiRoutes } from './routes/ai.routes.js';
 import { searchRoutes } from './routes/search.routes.js';
 import { imagesRoutes } from './routes/images.routes.js';
 import { profileRoutes, profilePublicRoutes } from './routes/profile.routes.js';
+import { referencesRoutes } from './routes/references.routes.js';
+import { feedbackRoutes, adminFeedbackRoutes } from './routes/feedback.routes.js';
+import { notificationsRoutes } from './routes/notifications.routes.js';
 import { prisma, disconnectPrisma } from './lib/db.js';
 import { storageService } from './services/storage.service.js';
 
@@ -137,6 +140,10 @@ await fastify.register(searchRoutes, { prefix: '/api/search' });
 await fastify.register(imagesRoutes, { prefix: '/api' });
 await fastify.register(profilePublicRoutes, { prefix: '/api' }); // Public routes (no auth)
 await fastify.register(profileRoutes, { prefix: '/api' }); // Protected routes (auth required)
+await fastify.register(referencesRoutes, { prefix: '/api' }); // Wiki-link references routes
+await fastify.register(feedbackRoutes, { prefix: '/api' }); // User feedback submission
+await fastify.register(adminFeedbackRoutes, { prefix: '/api' }); // Admin feedback management
+await fastify.register(notificationsRoutes, { prefix: '/api' }); // User notifications
 
 // Serve frontend static files (in production)
 // Get the directory of the current module

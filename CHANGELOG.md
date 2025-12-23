@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2025-12-22
+
+**First Stable Release - User Feedback System & Phase 2 Features**
+
+Notez reaches v1.0.0 with the addition of a comprehensive in-app feedback system, completing the core feature set. Users can now submit bug reports and feature requests directly within the app, with full admin tools to manage and track submissions.
+
+### Added
+
+- **User Feedback System**: Complete bug report and feature request submission system
+  - Users can submit bugs or feature requests via modal accessible from user menu
+  - Optional category selection (UI/UX, Editor, AI Features, Organization, Other)
+  - Optional priority levels (Nice to Have, Helpful, Critical)
+  - Rate limited to 10 submissions per hour per user
+- **Admin Feedback Panel**: New Settings section for admins to manage feedback
+  - Dashboard with stats cards (Total, Awaiting Review, Bugs, Features)
+  - Clickable stats to filter submissions
+  - Status workflow: New → Reviewed → Approved/Declined → Published
+  - Admin notes with auto-save
+  - "Mark as Shipped" functionality for completed features
+  - Bulk filtering by type, status, and category
+- **Admin Notifications**: Bell icon with unread count in header
+  - Real-time notification when new feedback is submitted
+  - Click notification to navigate directly to feedback item
+  - Mark as read on click, mark all read option
+- **Wiki-Links Backlinks System**: Find all notes that reference a given note
+- **Load Testing Infrastructure**: k6-based load testing for performance validation
+
+### Fixed
+
+- **Session Refresh Race Condition**: Fixed Prisma error when multiple tabs refresh tokens simultaneously
+- **Settings Navigation**: Changed from hash-based (`#section`) to route-based (`/settings/section`) navigation
+- **Infinite Reload Loop**: Fixed Settings page reload issue caused by hash-based navigation
+
+### Technical
+
+- New `FeedbackSubmission` and `Notification` database models
+- New `/api/feedback/*` endpoints for user submissions
+- New `/api/admin/feedback/*` endpoints for admin management
+- New `/api/notifications/*` endpoints for notification system
+- Debounced auto-save for admin notes (1 second delay)
+- TanStack Query mutations with proper cache invalidation
+
 ## [1.0.0-rc.2] - 2025-12-03
 
 **Security Hardening Release**
@@ -246,7 +288,8 @@ All success criteria from the MVP specification have been met:
 - Docker deployment support
 - Multi-user authentication
 
-[Unreleased]: https://github.com/SpasticPalate/notez/compare/v1.0.0-rc.2...HEAD
+[Unreleased]: https://github.com/SpasticPalate/notez/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/SpasticPalate/notez/compare/v1.0.0-rc.2...v1.0.0
 [1.0.0-rc.2]: https://github.com/SpasticPalate/notez/compare/v1.0.0-rc.1...v1.0.0-rc.2
 [1.0.0-rc.1]: https://github.com/SpasticPalate/notez/compare/v0.32.0...v1.0.0-rc.1
 [0.32.0]: https://github.com/SpasticPalate/notez/compare/v0.31.1...v0.32.0

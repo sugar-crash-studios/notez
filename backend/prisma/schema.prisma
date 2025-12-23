@@ -37,6 +37,8 @@ model User {
   images              Image[]
   aiSettings          UserAISettings?
   passwordResetTokens PasswordResetToken[]
+  feedbackSubmissions FeedbackSubmission[]
+  notifications       Notification[]
 
   @@map("users")
 }
@@ -87,11 +89,12 @@ model Note {
   updatedAt    DateTime                  @updatedAt @map("updated_at")
 
   // Relations
-  user   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  folder Folder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
-  tags   NoteTag[]
-  tasks  Task[]
-  images Image[]
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folder      Folder?    @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  tags        NoteTag[]
+  tasks       Task[]
+  images      Image[]
+  sourceLinks NoteLink[] @relation("sourceLinks")
 
   @@index([searchVector], type: Gin)
   @@map("notes")
@@ -251,4 +254,97 @@ model PasswordResetToken {
   @@index([token])
   @@index([userId])
   @@map("password_reset_tokens")
+}
+
+// Note links for wiki-style [[references]]
+model NoteLink {
+  id            String   @id @default(uuid())
+  sourceNoteId  String   @map("source_note_id")
+  targetKeyword String   @map("target_keyword") @db.VarChar(255)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // Relations
+  sourceNote Note @relation("sourceLinks", fields: [sourceNoteId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceNoteId, targetKeyword])
+  @@index([targetKeyword])
+  @@index([sourceNoteId])
+  @@map("note_links")
+}
+
+// Feedback submission types
+enum FeedbackType {
+  BUG
+  FEATURE
+}
+
+// Feedback submission status
+enum FeedbackStatus {
+  NEW
+  REVIEWED
+  APPROVED
+  PUBLISHED
+  DECLINED
+}
+
+// User feedback submissions (bug reports and feature requests)
+model FeedbackSubmission {
+  id              String          @id @default(uuid())
+  type            FeedbackType
+  title           String          @db.VarChar(100)
+  description     String          @db.Text
+  category        String?         @db.VarChar(50)
+  priority        String?         @db.VarChar(50)
+  status          FeedbackStatus  @default(NEW)
+  adminNotes      String?         @map("admin_notes") @db.Text
+
+  // GitHub integration
+  githubIssueUrl    String?       @map("github_issue_url") @db.VarChar(500)
+  githubIssueNumber Int?          @map("github_issue_number")
+
+  // AI enhancement cache (stores enhanced content as JSON)
+  enhancedContent   Json?         @map("enhanced_content")
+
+  // Shipped status for "User Requested" badge
+  shipped           Boolean       @default(false)
+  shippedAt         DateTime?     @map("shipped_at")
+
+  // User relation
+  userId          String          @map("user_id")
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Timestamps
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  reviewedAt      DateTime?       @map("reviewed_at")
+  publishedAt     DateTime?       @map("published_at")
+
+  @@index([userId])
+  @@index([status])
+  @@index([type, status])
+  @@map("feedback_submissions")
+}
+
+// User notifications
+model Notification {
+  id        String    @id @default(uuid())
+  type      String    @db.VarChar(50)  // NEW_FEEDBACK, STATUS_CHANGE, etc.
+  title     String    @db.VarChar(200)
+  message   String?   @db.Text
+  isRead    Boolean   @default(false) @map("is_read")
+
+  // Link to related entity
+  linkType  String    @map("link_type") @db.VarChar(50)  // feedback, note, etc.
+  linkId    String    @map("link_id")
+
+  // Recipient
+  userId    String    @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  readAt    DateTime? @map("read_at")
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@map("notifications")
 }

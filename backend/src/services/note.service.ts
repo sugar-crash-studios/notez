@@ -1,5 +1,6 @@
 import { prisma } from '../lib/db.js';
 import type { CreateNoteInput, UpdateNoteInput } from '../utils/validation.schemas.js';
+import { syncNoteLinks } from './notelink.service.js';
 
 /**
  * Get note by ID
@@ -195,10 +196,17 @@ export async function createNote(userId: string, data: CreateNoteInput) {
     });
 
     // Transform tags to simpler format
-    return {
+    const result = {
       ...note,
       tags: note.tags.map((nt: any) => nt.tag),
     };
+
+    // Sync wiki-links asynchronously (don't block the response)
+    syncNoteLinks(note.id, note.content).catch((err) => {
+      console.error('Failed to sync note links:', err);
+    });
+
+    return result;
   });
 }
 
@@ -290,10 +298,19 @@ export async function updateNote(noteId: string, userId: string, data: UpdateNot
     });
 
     // Transform tags to simpler format
-    return {
+    const result = {
       ...note,
       tags: note.tags.map((nt: any) => nt.tag),
     };
+
+    // Sync wiki-links if content was updated
+    if (data.content !== undefined) {
+      syncNoteLinks(note.id, note.content).catch((err) => {
+        console.error('Failed to sync note links:', err);
+      });
+    }
+
+    return result;
   });
 }
 

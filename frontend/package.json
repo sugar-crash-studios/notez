@@ -1,7 +1,7 @@
 {
   "name": "notez-frontend",
   "private": true,
-  "version": "1.0.0-rc.2",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -24,8 +24,9 @@
     "@types/marked": "^5.0.2",
     "@types/turndown": "^5.0.6",
     "axios": "^1.7.9",
+    "date-fns": "^4.1.0",
     "dompurify": "^3.3.0",
-    "lucide-react": "^0.468.0",
+    "lucide-react": "^0.553.0",
     "marked": "^16.4.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

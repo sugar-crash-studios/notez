@@ -1,5 +1,6 @@
 import { SearchBar } from './SearchBar';
 import { ThemeToggle } from './ThemeToggle';
+import { NotificationBell } from './NotificationBell';
 import { UserDropdown } from './UserDropdown';
 
 export function AppHeader() {
@@ -16,6 +17,7 @@ export function AppHeader() {
           <SearchBar />
         </div>
         <ThemeToggle />
+        <NotificationBell />
         <UserDropdown />
       </div>
     </nav>

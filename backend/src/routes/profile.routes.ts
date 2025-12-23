@@ -16,6 +16,12 @@ const avatarUploadRateLimitConfig = {
   },
 };
 
+// 1x1 transparent PNG for missing avatars (avoids 404 console errors)
+const TRANSPARENT_PIXEL = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+  'base64'
+);
+
 /**
  * Public profile routes (no authentication required)
  */
@@ -23,6 +29,7 @@ export async function profilePublicRoutes(fastify: FastifyInstance) {
   /**
    * GET /api/profile/avatar/:userId
    * Get user avatar image (public endpoint - no auth required)
+   * Returns a transparent 1x1 pixel if no avatar exists (to avoid 404 console errors)
    */
   fastify.get('/profile/avatar/:userId', async (request, reply) => {
     try {
@@ -31,11 +38,12 @@ export async function profilePublicRoutes(fastify: FastifyInstance) {
       const avatar = await storageService.getAvatar(userId);
 
       if (!avatar) {
-        // Return 404 - client should use default avatar
-        return reply.status(404).send({
-          error: 'Not Found',
-          message: 'Avatar not found',
-        });
+        // Return a transparent 1x1 pixel instead of 404
+        // The X-Avatar-Status header lets the client know this is a placeholder
+        reply.header('Content-Type', 'image/png');
+        reply.header('Cache-Control', 'public, max-age=60'); // Short cache for placeholder
+        reply.header('X-Avatar-Status', 'not-found');
+        return reply.send(TRANSPARENT_PIXEL);
       }
 
       // Generate ETag from content hash for conditional requests

@@ -1,15 +1,16 @@
-import { useCallback, useEffect } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { User, Bot, Shield, ArrowLeft } from 'lucide-react';
+import { useCallback } from 'react';
+import { useNavigate, useParams, Link } from 'react-router-dom';
+import { User, Bot, Shield, ArrowLeft, MessageSquare } from 'lucide-react';
 import { AppHeader } from '../components/AppHeader';
 import { ProfileSettings } from '../components/ProfileSettings';
 import { AISettings } from '../components/AISettings';
 import { AdminPanel } from '../components/AdminPanel';
+import { AdminFeedbackPanel } from '../components/AdminFeedbackPanel';
 import { useAuth } from '../contexts/AuthContext';
 
-type SettingsSection = 'profile' | 'ai' | 'admin';
+export type SettingsSection = 'profile' | 'ai' | 'admin' | 'feedback';
 
-const SECTION_CONFIG = {
+export const SECTION_CONFIG = {
   profile: {
     label: 'Profile',
     icon: User,
@@ -28,42 +29,32 @@ const SECTION_CONFIG = {
     description: 'Manage users and system settings',
     adminOnly: true,
   },
+  feedback: {
+    label: 'Feedback',
+    icon: MessageSquare,
+    description: 'Review user feedback and feature requests',
+    adminOnly: true,
+  },
 };
 
 export function SettingsHub() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
+  const { section } = useParams<{ section?: SettingsSection }>();
 
-  // Derive active section directly from URL hash (single source of truth)
-  // This avoids useState/useEffect sync loops by computing from URL each render
-  const rawHash = location.hash.replace('#', '') as SettingsSection;
-  const isValidSection = rawHash && SECTION_CONFIG[rawHash];
-  const isUnauthorizedAdmin = rawHash === 'admin' && user?.role !== 'admin';
+  // Determine active section from URL path parameter
+  const rawSection = section as SettingsSection | undefined;
+  const isValidSection = rawSection && SECTION_CONFIG[rawSection];
+  const isAdminSection = rawSection === 'admin' || rawSection === 'feedback';
+  const isUnauthorizedAdmin = isAdminSection && user?.role !== 'admin';
 
-  const activeSection: SettingsSection = (() => {
-    if (isValidSection) {
-      // If admin section requested but user is not admin, default to profile
-      if (isUnauthorizedAdmin) {
-        return 'profile';
-      }
-      return rawHash;
-    }
-    return 'profile';
-  })();
+  // Default to 'profile' if invalid section or unauthorized
+  const activeSection: SettingsSection =
+    isValidSection && !isUnauthorizedAdmin ? rawSection : 'profile';
 
-  // One-time URL correction: sync hash when it's invalid or unauthorized
-  // This runs only when there's a mismatch, not on every render
-  useEffect(() => {
-    const needsCorrection = !isValidSection || isUnauthorizedAdmin;
-    if (needsCorrection && location.hash !== `#${activeSection}`) {
-      navigate(`/settings#${activeSection}`, { replace: true });
-    }
-  }, [isValidSection, isUnauthorizedAdmin, activeSection, location.hash, navigate]);
-
-  // Navigate to section - updates URL which triggers re-render with new activeSection
-  const navigateToSection = useCallback((section: SettingsSection) => {
-    navigate(`/settings#${section}`, { replace: true });
+  // Navigate to section - updates URL path
+  const navigateToSection = useCallback((newSection: SettingsSection) => {
+    navigate(`/settings/${newSection}`, { replace: true });
   }, [navigate]);
 
   // Filter sections based on user role
@@ -79,6 +70,8 @@ export function SettingsHub() {
         return <AISettings />;
       case 'admin':
         return user?.role === 'admin' ? <AdminPanel /> : null;
+      case 'feedback':
+        return user?.role === 'admin' ? <AdminFeedbackPanel /> : null;
       default:
         return <ProfileSettings />;
     }
