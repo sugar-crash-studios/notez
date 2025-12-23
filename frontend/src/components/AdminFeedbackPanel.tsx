@@ -163,7 +163,7 @@ export function AdminFeedbackPanel() {
       // Clear URL param
       setSearchParams({}, { replace: true });
     }
-  }, [pendingExpandId, submissions, adminNotes, setSearchParams]);
+  }, [pendingExpandId, submissions, setSearchParams]);
 
   // Auto-save notes with debounce
   const debouncedSaveNotes = useCallback((id: string, notes: string) => {

@@ -29,22 +29,34 @@ export function ReferencesPanel({ keyword, onClose, onNoteClick }: ReferencesPan
   const [result, setResult] = useState<ReferencesResult | null>(null);
 
   useEffect(() => {
+    let isCancelled = false;
+
     async function fetchReferences() {
       setLoading(true);
       setError(null);
 
       try {
         const response = await referencesApi.findByKeyword(keyword);
-        setResult(response.data);
+        if (!isCancelled) {
+          setResult(response.data);
+        }
       } catch (err) {
         console.error('Failed to fetch references:', err);
-        setError('Failed to load references');
+        if (!isCancelled) {
+          setError('Failed to load references');
+        }
       } finally {
-        setLoading(false);
+        if (!isCancelled) {
+          setLoading(false);
+        }
       }
     }
 
     fetchReferences();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [keyword]);
 
   const formatDate = (dateString: string) => {

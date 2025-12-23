@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { X, Bug, Lightbulb, Send, CheckCircle, AlertCircle } from 'lucide-react';
 import { feedbackApi, type FeedbackType, type FeedbackCategory, type FeedbackPriority } from '../lib/api';
@@ -29,6 +29,16 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
   const [category, setCategory] = useState<FeedbackCategory | ''>('');
   const [priority, setPriority] = useState<FeedbackPriority | ''>('');
   const [showSuccess, setShowSuccess] = useState(false);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup timer on unmount to prevent memory leak
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current);
+      }
+    };
+  }, []);
 
   const submitMutation = useMutation({
     mutationFn: () =>
@@ -41,8 +51,8 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
       }),
     onSuccess: () => {
       setShowSuccess(true);
-      // Reset form after short delay
-      setTimeout(() => {
+      // Reset form after short delay (with cleanup)
+      closeTimerRef.current = setTimeout(() => {
         resetForm();
         onClose();
       }, 2000);

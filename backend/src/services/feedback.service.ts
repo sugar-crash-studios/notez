@@ -26,15 +26,17 @@ export async function createFeedback(userId: string, input: CreateFeedbackInput)
     },
   });
 
-  // Notify all admins about the new submission
+  // Notify all admins about the new submission (don't block on errors)
   const typeLabel = input.type === 'BUG' ? 'bug report' : 'feature request';
-  await notificationService.notifyAdmins(
+  notificationService.notifyAdmins(
     'NEW_FEEDBACK',
     `New ${typeLabel}: ${input.title}`,
     'feedback',
     feedback.id,
     `${feedback.user.username} submitted a ${typeLabel}`
-  );
+  ).catch(err => {
+    console.error('Failed to notify admins:', err);
+  });
 
   return feedback;
 }

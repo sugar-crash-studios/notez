@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Bell, Check, CheckCheck, Trash2, MessageSquare, ExternalLink } from 'lucide-react';
 import { notificationsApi } from '../lib/api';
@@ -19,6 +20,7 @@ interface Notification {
 
 export function NotificationBell() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
@@ -109,7 +111,7 @@ export function NotificationBell() {
     if (notification.linkType === 'feedback') {
       // For admins, navigate to feedback section with the item ID in search params
       if (user?.role === 'admin') {
-        window.location.href = `/settings/feedback?expandFeedback=${notification.linkId}`;
+        navigate(`/settings/feedback?expandFeedback=${notification.linkId}`);
       }
     }
 
