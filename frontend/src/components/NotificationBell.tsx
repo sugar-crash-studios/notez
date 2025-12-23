@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bell, Check, CheckCheck, Trash2, MessageSquare, ExternalLink } from 'lucide-react';
+import { Bell, Check, CheckCheck, Trash2, MessageSquare, RefreshCw, Sparkles } from 'lucide-react';
 import { notificationsApi } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
@@ -113,6 +113,11 @@ export function NotificationBell() {
       if (user?.role === 'admin') {
         navigate(`/settings/feedback?expandFeedback=${notification.linkId}`);
       }
+      // For regular users, the notification itself contains the update info
+      // No navigation needed - they can see the status update in the notification message
+    } else if (notification.linkType === 'release') {
+      // Navigate to changelog/What's New - clicking the version number in settings
+      navigate('/settings/profile');
     }
 
     setIsOpen(false);
@@ -122,8 +127,10 @@ export function NotificationBell() {
     switch (type) {
       case 'NEW_FEEDBACK':
         return <MessageSquare className="w-4 h-4 text-blue-500" />;
-      case 'FEEDBACK_PUBLISHED':
-        return <ExternalLink className="w-4 h-4 text-green-500" />;
+      case 'FEEDBACK_STATUS_CHANGE':
+        return <RefreshCw className="w-4 h-4 text-green-500" />;
+      case 'NEW_RELEASE':
+        return <Sparkles className="w-4 h-4 text-purple-500" />;
       default:
         return <Bell className="w-4 h-4 text-gray-500" />;
     }

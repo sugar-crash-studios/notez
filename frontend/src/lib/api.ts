@@ -397,4 +397,8 @@ export const notificationsApi = {
   markAllAsRead: () => api.post('/api/notifications/mark-all-read'),
 
   delete: (id: string) => api.delete(`/api/notifications/${id}`),
+
+  // Admin: send release notification to all users
+  sendReleaseNotification: (version: string, highlights?: string) =>
+    api.post('/api/admin/notifications/release', { version, highlights }),
 };

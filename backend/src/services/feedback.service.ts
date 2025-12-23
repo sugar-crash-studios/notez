@@ -35,7 +35,13 @@ export async function createFeedback(userId: string, input: CreateFeedbackInput)
     feedback.id,
     `${feedback.user.username} submitted a ${typeLabel}`
   ).catch(err => {
-    console.error('Failed to notify admins:', err);
+    // Structured log for notification failure (non-blocking)
+    console.error(JSON.stringify({
+      level: 'error',
+      action: 'NOTIFY_ADMINS_FAILED',
+      feedbackId: feedback.id,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    }));
   });
 
   return feedback;
@@ -202,6 +208,39 @@ export async function updateFeedback(feedbackId: string, input: UpdateFeedbackIn
       },
     },
   });
+
+  // Notify user if status changed (and it's a meaningful status change)
+  if (input.status !== undefined && input.status !== existing.status) {
+    const statusMessages: Record<string, string> = {
+      REVIEWED: 'Your feedback has been reviewed by our team',
+      APPROVED: 'Great news! Your feedback has been approved',
+      DECLINED: 'Your feedback has been reviewed',
+      PUBLISHED: 'Your feedback has been published',
+    };
+
+    const message = statusMessages[input.status];
+    if (message) {
+      const typeLabel = feedback.type === 'BUG' ? 'bug report' : 'feature request';
+      notificationService.notifyUser(
+        feedback.userId,
+        'FEEDBACK_STATUS_CHANGE',
+        `${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)} update: ${feedback.title}`,
+        'feedback',
+        feedback.id,
+        message
+      ).catch(err => {
+        // Structured log for notification failure (non-blocking)
+        console.error(JSON.stringify({
+          level: 'error',
+          action: 'NOTIFY_USER_STATUS_CHANGE_FAILED',
+          feedbackId: feedback.id,
+          userId: feedback.userId,
+          newStatus: input.status,
+          error: err instanceof Error ? err.message : 'Unknown error',
+        }));
+      });
+    }
+  }
 
   return feedback;
 }

@@ -1,6 +1,6 @@
 import { prisma } from '../lib/db.js';
 
-export type NotificationType = 'NEW_FEEDBACK' | 'STATUS_CHANGE' | 'FEEDBACK_PUBLISHED';
+export type NotificationType = 'NEW_FEEDBACK' | 'FEEDBACK_STATUS_CHANGE' | 'NEW_RELEASE';
 
 export interface CreateNotificationInput {
   type: NotificationType;
@@ -23,6 +23,7 @@ export async function createNotification(input: CreateNotificationInput) {
       linkType: input.linkType,
       linkId: input.linkId,
       userId: input.userId,
+      isRead: false,
     },
   });
 
@@ -60,6 +61,71 @@ export async function notifyAdmins(
       linkType,
       linkId,
       userId: admin.id,
+      isRead: false,
+    })),
+  });
+
+  return notifications;
+}
+
+/**
+ * Notify a specific user
+ * Used for feedback status changes
+ */
+export async function notifyUser(
+  userId: string,
+  type: NotificationType,
+  title: string,
+  linkType: string,
+  linkId: string,
+  message?: string
+) {
+  const notification = await prisma.notification.create({
+    data: {
+      type,
+      title,
+      message: message || null,
+      linkType,
+      linkId,
+      userId,
+      isRead: false,
+    },
+  });
+
+  return notification;
+}
+
+/**
+ * Create notifications for all active users
+ * Used for new release announcements
+ */
+export async function notifyAllUsers(
+  type: NotificationType,
+  title: string,
+  linkType: string,
+  linkId: string,
+  message?: string
+) {
+  // Get all active users
+  const users = await prisma.user.findMany({
+    where: {
+      isActive: true,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  // Create a notification for each user
+  const notifications = await prisma.notification.createMany({
+    data: users.map((user) => ({
+      type,
+      title,
+      message: message || null,
+      linkType,
+      linkId,
+      userId: user.id,
+      isRead: false,
     })),
   });
 

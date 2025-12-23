@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2025-12-23
+
+**User Notifications Expansion**
+
+Extending the notification system to all users, not just admins. Users now receive notifications when their feedback status changes, and admins can send release notifications to announce new versions.
+
+### Added
+
+- **Feedback Status Notifications**: Users receive notifications when their bug report or feature request status changes (reviewed, approved, declined, published)
+- **Release Notifications**: Admin endpoint to send new version announcements to all users
+- **User-Facing Notification Bell**: All users now see the notification bell (previously admin-only)
+
+### Changed
+
+- Notification types updated: `NEW_FEEDBACK` (admin), `FEEDBACK_STATUS_CHANGE` (user), `NEW_RELEASE` (all users)
+
+### Technical
+
+- New `notifyUser()` and `notifyAllUsers()` functions in notification service
+- New admin endpoint `POST /api/admin/notifications/release` for sending release notifications
+- Updated `NotificationBell` component with new notification type icons
+
 ## [1.0.0] - 2025-12-22
 
 **First Stable Release - User Feedback System & Phase 2 Features**
@@ -288,7 +310,8 @@ All success criteria from the MVP specification have been met:
 - Docker deployment support
 - Multi-user authentication
 
-[Unreleased]: https://github.com/SpasticPalate/notez/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/SpasticPalate/notez/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/SpasticPalate/notez/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/SpasticPalate/notez/compare/v1.0.0-rc.2...v1.0.0
 [1.0.0-rc.2]: https://github.com/SpasticPalate/notez/compare/v1.0.0-rc.1...v1.0.0-rc.2
 [1.0.0-rc.1]: https://github.com/SpasticPalate/notez/compare/v0.32.0...v1.0.0-rc.1
