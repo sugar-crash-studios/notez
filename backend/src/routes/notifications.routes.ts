@@ -16,6 +16,12 @@ const listNotificationsQuerySchema = z.object({
   unreadOnly: z.coerce.boolean().default(false),
 });
 
+// Body schemas
+const releaseNotificationBodySchema = z.object({
+  version: z.string().min(1, 'Version is required').max(50, 'Version too long'),
+  highlights: z.string().max(500, 'Highlights too long').optional(),
+});
+
 export async function notificationsRoutes(fastify: FastifyInstance) {
   // All routes require authentication
   fastify.addHook('preHandler', authenticateToken);
@@ -183,24 +189,42 @@ export async function notificationsRoutes(fastify: FastifyInstance) {
           });
         }
 
-        const body = request.body as { version: string; highlights?: string };
-
-        if (!body.version) {
+        // Validate request body with Zod
+        const parseResult = releaseNotificationBodySchema.safeParse(request.body);
+        if (!parseResult.success) {
           return reply.status(400).send({
             error: 'Bad Request',
-            message: 'Version is required',
+            message: parseResult.error.errors.map((e) => e.message).join(', '),
           });
         }
 
-        const highlights = body.highlights || 'Check out the latest features and improvements!';
+        const { version, highlights: rawHighlights } = parseResult.data;
+        const highlights = rawHighlights || 'Check out the latest features and improvements!';
+
+        // Audit log: admin sending release notification
+        fastify.log.info({
+          action: 'SEND_RELEASE_NOTIFICATION',
+          adminId: request.user!.userId,
+          adminUsername: request.user!.username,
+          version,
+          hasCustomHighlights: !!rawHighlights,
+        }, 'Admin sending release notification to all users');
 
         const result = await notificationService.notifyAllUsers(
           'NEW_RELEASE',
-          `🎉 Notez ${body.version} is here!`,
+          `🎉 Notez ${version} is here!`,
           'release',
-          body.version,
+          version,
           highlights
         );
+
+        // Audit log: success
+        fastify.log.info({
+          action: 'SEND_RELEASE_NOTIFICATION_SUCCESS',
+          adminId: request.user!.userId,
+          version,
+          notificationCount: result.count,
+        }, 'Release notification sent successfully');
 
         return {
           message: 'Release notification sent',

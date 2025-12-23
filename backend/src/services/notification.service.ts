@@ -23,6 +23,7 @@ export async function createNotification(input: CreateNotificationInput) {
       linkType: input.linkType,
       linkId: input.linkId,
       userId: input.userId,
+      isRead: false,
     },
   });
 
@@ -60,6 +61,7 @@ export async function notifyAdmins(
       linkType,
       linkId,
       userId: admin.id,
+      isRead: false,
     })),
   });
 
@@ -86,6 +88,7 @@ export async function notifyUser(
       linkType,
       linkId,
       userId,
+      isRead: false,
     },
   });
 
@@ -122,6 +125,7 @@ export async function notifyAllUsers(
       linkType,
       linkId,
       userId: user.id,
+      isRead: false,
     })),
   });
 

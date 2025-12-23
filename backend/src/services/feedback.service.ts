@@ -35,7 +35,13 @@ export async function createFeedback(userId: string, input: CreateFeedbackInput)
     feedback.id,
     `${feedback.user.username} submitted a ${typeLabel}`
   ).catch(err => {
-    console.error('Failed to notify admins:', err);
+    // Structured log for notification failure (non-blocking)
+    console.error(JSON.stringify({
+      level: 'error',
+      action: 'NOTIFY_ADMINS_FAILED',
+      feedbackId: feedback.id,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    }));
   });
 
   return feedback;
@@ -223,7 +229,15 @@ export async function updateFeedback(feedbackId: string, input: UpdateFeedbackIn
         feedback.id,
         message
       ).catch(err => {
-        console.error('Failed to notify user of status change:', err);
+        // Structured log for notification failure (non-blocking)
+        console.error(JSON.stringify({
+          level: 'error',
+          action: 'NOTIFY_USER_STATUS_CHANGE_FAILED',
+          feedbackId: feedback.id,
+          userId: feedback.userId,
+          newStatus: input.status,
+          error: err instanceof Error ? err.message : 'Unknown error',
+        }));
       });
     }
   }
