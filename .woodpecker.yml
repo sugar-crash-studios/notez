@@ -1,0 +1,58 @@
+variables:
+  - &registry "ghcr.io"
+  - &image "ghcr.io/spasticpalate/notez"
+
+steps:
+  # Build and push Docker image
+  build:
+    image: woodpeckerci/plugin-docker-buildx
+    settings:
+      registry: *registry
+      repo: *image
+      username:
+        from_secret: github_username
+      password:
+        from_secret: github_token
+      platforms: linux/amd64
+      tags:
+        - ${CI_COMMIT_SHA}
+        - ${CI_COMMIT_BRANCH}
+        - latest
+    when:
+      branch: main
+      event: push
+
+  # Build only for PRs (no push)
+  build-pr:
+    image: woodpeckerci/plugin-docker-buildx
+    settings:
+      registry: *registry
+      repo: *image
+      platforms: linux/amd64
+      dry_run: true
+    when:
+      event: pull_request
+
+  # Deploy to Komodo
+  # Note: -k flag used because Komodo is accessed via Traefik reverse proxy with
+  # self-signed cert on internal network. CI runner and Komodo are on same trusted network.
+  deploy:
+    image: alpine/curl
+    commands:
+      - |
+        response=$(curl -sk --fail-with-body -w "%{http_code}" -o /tmp/response.json -X POST "https://komo.local.cogg.haus/execute" \
+          -H "X-API-KEY: $KOMODO_API_KEY" \
+          -H "X-API-SECRET: $KOMODO_API_SECRET" \
+          -H "Content-Type: application/json" \
+          -d '{"type": "DeployStack", "params": {"stack": "notez"}}')
+        echo "Deployment HTTP status: $response"
+        if [ "$response" -lt 200 ] || [ "$response" -ge 300 ]; then
+          echo "Deployment failed!"
+          cat /tmp/response.json 2>/dev/null || true
+          exit 1
+        fi
+        echo "Deployment triggered successfully"
+    secrets: [komodo_api_key, komodo_api_secret]
+    when:
+      branch: main
+      event: push
