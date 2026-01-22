@@ -4,7 +4,7 @@ variables:
 
 steps:
   # Build and push Docker image
-  build:
+  - name: build
     image: woodpeckerci/plugin-docker-buildx
     settings:
       registry: *registry
@@ -23,7 +23,7 @@ steps:
       event: push
 
   # Build only for PRs (no push)
-  build-pr:
+  - name: build-pr
     image: woodpeckerci/plugin-docker-buildx
     settings:
       registry: *registry
@@ -36,8 +36,13 @@ steps:
   # Deploy to Komodo
   # Note: -k flag used because Komodo is accessed via Traefik reverse proxy with
   # self-signed cert on internal network. CI runner and Komodo are on same trusted network.
-  deploy:
+  - name: deploy
     image: alpine/curl
+    environment:
+      KOMODO_API_KEY:
+        from_secret: komodo_api_key
+      KOMODO_API_SECRET:
+        from_secret: komodo_api_secret
     commands:
       - |
         response=$(curl -sk --fail-with-body -w "%{http_code}" -o /tmp/response.json -X POST "https://komo.local.cogg.haus/execute" \
@@ -52,7 +57,6 @@ steps:
           exit 1
         fi
         echo "Deployment triggered successfully"
-    secrets: [komodo_api_key, komodo_api_secret]
     when:
       branch: main
       event: push
