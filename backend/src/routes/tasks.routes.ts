@@ -11,6 +11,8 @@ import {
   listTasksQuerySchema,
   scanTasksSchema,
   importTasksSchema,
+  addTaskLinkSchema,
+  updateTaskLinkSchema,
   type CreateTaskInput,
   type UpdateTaskInput,
   type UpdateTaskStatusInput,
@@ -21,6 +23,11 @@ import {
 // Param schemas
 const taskIdParamSchema = z.object({
   id: z.string().uuid('Invalid task ID format'),
+});
+
+const linkIdParamSchema = z.object({
+  id: z.string().uuid('Invalid task ID format'),
+  linkId: z.string().uuid('Invalid link ID format'),
 });
 
 export async function tasksRoutes(fastify: FastifyInstance) {
@@ -45,6 +52,8 @@ export async function tasksRoutes(fastify: FastifyInstance) {
           noteId: query.noteId,
           tagId: query.tagId,
           overdue: query.overdue,
+          sortBy: query.sortBy,
+          sortOrder: query.sortOrder,
           limit: query.limit,
           offset: query.offset,
         });
@@ -295,6 +304,110 @@ export async function tasksRoutes(fastify: FastifyInstance) {
         return reply.status(500).send({
           error: 'Internal Server Error',
           message: 'Failed to delete task',
+        });
+      }
+    }
+  );
+
+  // ============ Task Link Routes ============
+
+  // Add a link to a task
+  fastify.post(
+    '/tasks/:id/links',
+    {
+      preHandler: [validateParams(taskIdParamSchema), validateBody(addTaskLinkSchema)],
+    },
+    async (request, reply) => {
+      try {
+        const userId = request.user!.userId;
+        const params = request.params as z.infer<typeof taskIdParamSchema>;
+        const body = request.body as z.infer<typeof addTaskLinkSchema>;
+
+        const link = await taskService.addTaskLink(params.id, userId, body);
+        return reply.status(201).send(link);
+      } catch (error: any) {
+        fastify.log.error(error);
+
+        if (error.message === 'Task not found') {
+          return reply.status(404).send({
+            error: 'Not Found',
+            message: 'Task not found',
+          });
+        }
+
+        if (error.message === 'Maximum 10 links per task') {
+          return reply.status(400).send({
+            error: 'Bad Request',
+            message: error.message,
+          });
+        }
+
+        return reply.status(500).send({
+          error: 'Internal Server Error',
+          message: 'Failed to add link',
+        });
+      }
+    }
+  );
+
+  // Update a task link
+  fastify.patch(
+    '/tasks/:id/links/:linkId',
+    {
+      preHandler: [validateParams(linkIdParamSchema), validateBody(updateTaskLinkSchema)],
+    },
+    async (request, reply) => {
+      try {
+        const userId = request.user!.userId;
+        const params = request.params as z.infer<typeof linkIdParamSchema>;
+        const body = request.body as z.infer<typeof updateTaskLinkSchema>;
+
+        const link = await taskService.updateTaskLink(params.id, params.linkId, userId, body);
+        return link;
+      } catch (error: any) {
+        fastify.log.error(error);
+
+        if (error.message === 'Link not found') {
+          return reply.status(404).send({
+            error: 'Not Found',
+            message: 'Link not found',
+          });
+        }
+
+        return reply.status(500).send({
+          error: 'Internal Server Error',
+          message: 'Failed to update link',
+        });
+      }
+    }
+  );
+
+  // Delete a task link
+  fastify.delete(
+    '/tasks/:id/links/:linkId',
+    {
+      preHandler: validateParams(linkIdParamSchema),
+    },
+    async (request, reply) => {
+      try {
+        const userId = request.user!.userId;
+        const params = request.params as z.infer<typeof linkIdParamSchema>;
+
+        await taskService.deleteTaskLink(params.id, params.linkId, userId);
+        return reply.status(204).send();
+      } catch (error: any) {
+        fastify.log.error(error);
+
+        if (error.message === 'Link not found') {
+          return reply.status(404).send({
+            error: 'Not Found',
+            message: 'Link not found',
+          });
+        }
+
+        return reply.status(500).send({
+          error: 'Internal Server Error',
+          message: 'Failed to delete link',
         });
       }
     }

@@ -4,11 +4,15 @@ import { FolderSidebar, type FolderSidebarHandle } from '../components/FolderSid
 import { NoteList, type NoteListHandle } from '../components/NoteList';
 import { NoteEditor } from '../components/NoteEditor';
 import TaskList from '../components/TaskList';
+import KanbanBoard from '../components/KanbanBoard';
+import TaskForm from '../components/TaskForm';
 import { AppHeader } from '../components/AppHeader';
-import { Menu, FileText, Edit3, CheckSquare } from 'lucide-react';
+import { Menu, FileText, Edit3, CheckSquare, LayoutList, Columns } from 'lucide-react';
+import type { Task } from '../types';
 
-// localStorage key for sidebar state
+// localStorage keys
 const SIDEBAR_COLLAPSED_KEY = 'notez-sidebar-collapsed';
+const TASK_VIEW_MODE_KEY = 'notez-task-view-mode';
 
 export function EditorPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -21,7 +25,13 @@ export function EditorPage() {
     const saved = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
     return saved === 'true';
   });
+  const [taskViewMode, setTaskViewMode] = useState<'list' | 'kanban'>(() => {
+    const saved = localStorage.getItem(TASK_VIEW_MODE_KEY);
+    return (saved === 'kanban' ? 'kanban' : 'list') as 'list' | 'kanban';
+  });
   const [mobileView, setMobileView] = useState<'sidebar' | 'list' | 'editor'>('list');
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [kanbanKey, setKanbanKey] = useState(0); // For refreshing kanban
   const noteListRef = useRef<NoteListHandle>(null);
   const sidebarRef = useRef<FolderSidebarHandle>(null);
 
@@ -29,6 +39,11 @@ export function EditorPage() {
   useEffect(() => {
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(sidebarCollapsed));
   }, [sidebarCollapsed]);
+
+  // Persist task view mode
+  useEffect(() => {
+    localStorage.setItem(TASK_VIEW_MODE_KEY, taskViewMode);
+  }, [taskViewMode]);
 
   // Handle URL query parameter for note selection (from search)
   useEffect(() => {
@@ -121,7 +136,7 @@ export function EditorPage() {
         </div>
 
         {/* Note List or Task List - Hidden on mobile unless mobileView === 'list' */}
-        <div className={`${mobileView === 'list' ? 'block' : 'hidden'} xl:block`}>
+        <div className={`${mobileView === 'list' ? 'block' : 'hidden'} xl:block ${selectedView === 'tasks' && taskViewMode === 'kanban' ? 'xl:w-80' : ''}`}>
           {selectedView === 'notes' ? (
             <NoteList
               ref={noteListRef}
@@ -135,7 +150,34 @@ export function EditorPage() {
               }}
             />
           ) : (
-            <TaskList onNoteClick={handleNoteClick} />
+            <div className="flex flex-col h-full">
+              {/* Task View Mode Toggle */}
+              <div className="hidden xl:flex items-center justify-end gap-1 p-2 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                <button
+                  onClick={() => setTaskViewMode('list')}
+                  className={`p-1.5 rounded ${
+                    taskViewMode === 'list'
+                      ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400'
+                      : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
+                  title="List view"
+                >
+                  <LayoutList className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setTaskViewMode('kanban')}
+                  className={`p-1.5 rounded ${
+                    taskViewMode === 'kanban'
+                      ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400'
+                      : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                  }`}
+                  title="Kanban view"
+                >
+                  <Columns className="w-4 h-4" />
+                </button>
+              </div>
+              <TaskList onNoteClick={handleNoteClick} />
+            </div>
           )}
         </div>
 
@@ -169,7 +211,31 @@ export function EditorPage() {
             />
           </div>
         )}
+
+        {/* Kanban Board - Only visible on desktop when tasks view + kanban mode */}
+        {selectedView === 'tasks' && taskViewMode === 'kanban' && (
+          <div className="hidden xl:flex flex-1 flex-col min-h-0">
+            <KanbanBoard
+              key={kanbanKey}
+              onNoteClick={handleNoteClick}
+              onTaskClick={(task) => setEditingTask(task)}
+            />
+          </div>
+        )}
       </div>
+
+      {/* Task Edit Modal */}
+      {editingTask && (
+        <TaskForm
+          task={editingTask}
+          onClose={() => setEditingTask(null)}
+          onSuccess={() => {
+            setEditingTask(null);
+            // Refresh kanban board
+            setKanbanKey((k) => k + 1);
+          }}
+        />
+      )}
 
       {/* Mobile Bottom Navigation - Only visible on small screens */}
       <div className="xl:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex justify-around py-4 px-2 min-h-[60px] z-50">

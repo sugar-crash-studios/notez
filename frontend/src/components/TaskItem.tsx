@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CheckCircle2, Circle, Clock, AlertCircle, FileText, Trash2, Edit } from 'lucide-react';
+import { CheckCircle2, Circle, Clock, AlertCircle, FileText, Trash2, Edit, Link2, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
 import type { Task } from '../types';
 
 interface TaskItemProps {
@@ -31,9 +31,9 @@ export default function TaskItem({
   onDelete,
   onNoteClick,
 }: TaskItemProps) {
-  const [isHovered, setIsHovered] = useState(false);
-
+  const [showLinks, setShowLinks] = useState(false);
   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'COMPLETED' && task.status !== 'CANCELLED';
+  const hasLinks = task.links && task.links.length > 0;
 
   const handleStatusClick = () => {
     if (task.status === 'PENDING') {
@@ -60,11 +60,9 @@ export default function TaskItem({
 
   return (
     <div
-      className={`p-3 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
+      className={`group relative p-3 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
         isOverdue ? 'bg-red-50 dark:bg-red-900/10' : ''
       }`}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
     >
       <div className="flex items-start gap-3">
         {/* Status Checkbox */}
@@ -83,7 +81,7 @@ export default function TaskItem({
         </button>
 
         {/* Task Content */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 pr-16">
           {/* Title */}
           <div className={`font-medium text-sm ${task.status === 'COMPLETED' ? 'line-through text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white'}`}>
             {task.title}
@@ -150,28 +148,67 @@ export default function TaskItem({
                 )}
               </div>
             )}
+
+            {/* Links indicator */}
+            {hasLinks && (
+              <button
+                onClick={() => setShowLinks(!showLinks)}
+                className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                title={`${task.links!.length} link(s)`}
+              >
+                <Link2 className="w-3 h-3" />
+                <span>{task.links!.length}</span>
+                {showLinks ? (
+                  <ChevronUp className="w-3 h-3" />
+                ) : (
+                  <ChevronDown className="w-3 h-3" />
+                )}
+              </button>
+            )}
           </div>
+
+          {/* Expanded links section */}
+          {hasLinks && showLinks && (
+            <div className="mt-2 pl-1 space-y-1">
+              {task.links!.map((link) => (
+                <a
+                  key={link.id}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                  <span className="truncate">{link.title || link.url}</span>
+                </a>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Actions */}
-        {isHovered && (
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <button
-              onClick={() => onEdit(task)}
-              className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
-              title="Edit task"
-            >
-              <Edit className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-            </button>
-            <button
-              onClick={() => onDelete(task.id)}
-              className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
-              title="Delete task"
-            >
-              <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
-            </button>
-          </div>
-        )}
+        {/* Actions - Absolute positioned to prevent layout shift */}
+        {/* On desktop: show on hover. On mobile/touch: always visible */}
+        <div
+          className={`absolute right-2 top-2 flex items-center gap-1
+            transition-opacity duration-150
+            bg-white/90 dark:bg-gray-800/90 rounded px-1 py-0.5
+            opacity-100 sm:opacity-0 sm:group-hover:opacity-100`}
+        >
+          <button
+            onClick={() => onEdit(task)}
+            className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
+            title="Edit task"
+          >
+            <Edit className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+          </button>
+          <button
+            onClick={() => onDelete(task.id)}
+            className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+            title="Delete task"
+          >
+            <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
+          </button>
+        </div>
       </div>
     </div>
   );

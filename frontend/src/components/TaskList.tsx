@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Plus, Download, Filter, X } from 'lucide-react';
-import { tasksApi, foldersApi } from '../lib/api';
+import { Plus, Download, Filter, X, ArrowUpDown } from 'lucide-react';
+import { tasksApi, foldersApi, type TaskSortBy, type TaskSortOrder } from '../lib/api';
 import type { Task, TaskStats } from '../types';
 import TaskItem from './TaskItem';
 import TaskForm from './TaskForm';
@@ -27,6 +27,8 @@ export default function TaskList({ onNoteClick }: TaskListProps) {
   const [selectedFolder, setSelectedFolder] = useState<string>('');
   const [showOverdueOnly, setShowOverdueOnly] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [sortBy, setSortBy] = useState<TaskSortBy>('priority');
+  const [sortOrder, setSortOrder] = useState<TaskSortOrder>('desc');
 
   // Modals
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -37,12 +39,12 @@ export default function TaskList({ onNoteClick }: TaskListProps) {
     loadTasks();
     loadStats();
     loadFolders();
-  }, [showCompleted, selectedPriority, selectedFolder, showOverdueOnly]);
+  }, [showCompleted, selectedPriority, selectedFolder, showOverdueOnly, sortBy, sortOrder]);
 
   const loadTasks = async () => {
     setIsLoading(true);
     try {
-      const params: any = { limit: 100 };
+      const params: any = { limit: 100, sortBy, sortOrder };
 
       if (!showCompleted) {
         params.status = ['PENDING', 'IN_PROGRESS'];
@@ -275,12 +277,40 @@ export default function TaskList({ onNoteClick }: TaskListProps) {
                 ))}
               </select>
             </div>
+
+            {/* Sort Options */}
+            <div className="border-t border-gray-200 dark:border-gray-600 pt-3 mt-3">
+              <div className="flex items-center gap-2 mb-2">
+                <ArrowUpDown className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Sort</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as TaskSortBy)}
+                  className="px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                >
+                  <option value="priority">Priority</option>
+                  <option value="dueDate">Due Date</option>
+                  <option value="createdAt">Created</option>
+                  <option value="title">Title</option>
+                </select>
+                <select
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value as TaskSortOrder)}
+                  className="px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                >
+                  <option value="desc">{sortBy === 'title' ? 'Z-A' : sortBy === 'dueDate' ? 'Latest First' : 'High to Low'}</option>
+                  <option value="asc">{sortBy === 'title' ? 'A-Z' : sortBy === 'dueDate' ? 'Earliest First' : 'Low to High'}</option>
+                </select>
+              </div>
+            </div>
           </div>
         )}
       </div>
 
       {/* Task List */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto pb-20 xl:pb-0">
         {isLoading ? (
           <div className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
             Loading...
@@ -289,7 +319,7 @@ export default function TaskList({ onNoteClick }: TaskListProps) {
           <div className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
             {hasActiveFilters || showCompleted
               ? 'No tasks match your filters.'
-              : 'No pending tasks! Click + to create one or import from notes.'}
+              : 'No pending tasks! Tap + to create one or import from notes.'}
           </div>
         ) : (
           <div>
@@ -306,6 +336,16 @@ export default function TaskList({ onNoteClick }: TaskListProps) {
           </div>
         )}
       </div>
+
+      {/* Mobile FAB - Floating Action Button for adding tasks on mobile */}
+      <button
+        onClick={() => setIsFormOpen(true)}
+        className="xl:hidden fixed right-4 bottom-24 w-14 h-14 bg-blue-600 dark:bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors flex items-center justify-center z-40"
+        title="New task"
+        aria-label="Create new task"
+      >
+        <Plus className="w-6 h-6" />
+      </button>
 
       {/* Modals */}
       {isFormOpen && (

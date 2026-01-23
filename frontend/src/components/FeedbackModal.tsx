@@ -83,7 +83,10 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
     }
   };
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
+  const handleBackdropMouseDown = (e: React.MouseEvent) => {
+    // Using mousedown instead of click prevents issues with text selection
+    // When user drags to select text and mouseup lands on backdrop, click fires
+    // but mousedown only fires if the click started on the backdrop
     if (e.target === e.currentTarget && !submitMutation.isPending) {
       handleClose();
     }
@@ -96,7 +99,7 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-      onClick={handleBackdropClick}
+      onMouseDown={handleBackdropMouseDown}
       role="dialog"
       aria-modal="true"
       aria-labelledby="feedback-title"
