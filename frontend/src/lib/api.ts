@@ -12,6 +12,11 @@ export const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  // Custom params serializer to handle arrays without brackets
+  // e.g., status[]=PENDING&status[]=IN_PROGRESS becomes status=PENDING&status=IN_PROGRESS
+  paramsSerializer: {
+    indexes: null, // Removes brackets from array params
+  },
 });
 
 // Request interceptor to add access token to requests

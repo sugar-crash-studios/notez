@@ -280,7 +280,7 @@ export default function TaskList({ onNoteClick }: TaskListProps) {
       </div>
 
       {/* Task List */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto pb-20 xl:pb-0">
         {isLoading ? (
           <div className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
             Loading...
@@ -289,7 +289,7 @@ export default function TaskList({ onNoteClick }: TaskListProps) {
           <div className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
             {hasActiveFilters || showCompleted
               ? 'No tasks match your filters.'
-              : 'No pending tasks! Click + to create one or import from notes.'}
+              : 'No pending tasks! Tap + to create one or import from notes.'}
           </div>
         ) : (
           <div>
@@ -306,6 +306,16 @@ export default function TaskList({ onNoteClick }: TaskListProps) {
           </div>
         )}
       </div>
+
+      {/* Mobile FAB - Floating Action Button for adding tasks on mobile */}
+      <button
+        onClick={() => setIsFormOpen(true)}
+        className="xl:hidden fixed right-4 bottom-24 w-14 h-14 bg-blue-600 dark:bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors flex items-center justify-center z-40"
+        title="New task"
+        aria-label="Create new task"
+      >
+        <Plus className="w-6 h-6" />
+      </button>
 
       {/* Modals */}
       {isFormOpen && (

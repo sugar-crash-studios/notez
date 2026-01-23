@@ -13,16 +13,24 @@ interface FolderChipProps {
   folders: FolderData[];
   selectedFolderId: string | null;
   onChange: (folderId: string | null) => void;
+  onRefresh?: () => void;
   disabled?: boolean;
 }
 
-export function FolderChip({ folders, selectedFolderId, onChange, disabled = false }: FolderChipProps) {
+export function FolderChip({ folders, selectedFolderId, onChange, onRefresh, disabled = false }: FolderChipProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const selectedFolder = folders.find(f => f.id === selectedFolderId);
+
+  // Refresh folders when dropdown opens
+  useEffect(() => {
+    if (isOpen && onRefresh) {
+      onRefresh();
+    }
+  }, [isOpen, onRefresh]);
 
   // Close dropdown when clicking outside
   useEffect(() => {

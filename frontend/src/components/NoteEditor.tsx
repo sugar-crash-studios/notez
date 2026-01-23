@@ -441,6 +441,7 @@ export function NoteEditor({ noteId, onNoteDeleted, onTagsChanged, onNoteUpdated
             folders={folders}
             selectedFolderId={selectedFolderId}
             onChange={setSelectedFolderId}
+            onRefresh={loadFolders}
             disabled={isDeleted}
           />
 
