@@ -1,4 +1,5 @@
-import { CheckCircle2, Circle, Clock, AlertCircle, FileText, Trash2, Edit } from 'lucide-react';
+import { useState } from 'react';
+import { CheckCircle2, Circle, Clock, AlertCircle, FileText, Trash2, Edit, Link2, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
 import type { Task } from '../types';
 
 interface TaskItemProps {
@@ -30,7 +31,9 @@ export default function TaskItem({
   onDelete,
   onNoteClick,
 }: TaskItemProps) {
+  const [showLinks, setShowLinks] = useState(false);
   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'COMPLETED' && task.status !== 'CANCELLED';
+  const hasLinks = task.links && task.links.length > 0;
 
   const handleStatusClick = () => {
     if (task.status === 'PENDING') {
@@ -145,7 +148,42 @@ export default function TaskItem({
                 )}
               </div>
             )}
+
+            {/* Links indicator */}
+            {hasLinks && (
+              <button
+                onClick={() => setShowLinks(!showLinks)}
+                className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                title={`${task.links!.length} link(s)`}
+              >
+                <Link2 className="w-3 h-3" />
+                <span>{task.links!.length}</span>
+                {showLinks ? (
+                  <ChevronUp className="w-3 h-3" />
+                ) : (
+                  <ChevronDown className="w-3 h-3" />
+                )}
+              </button>
+            )}
           </div>
+
+          {/* Expanded links section */}
+          {hasLinks && showLinks && (
+            <div className="mt-2 pl-1 space-y-1">
+              {task.links!.map((link) => (
+                <a
+                  key={link.id}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                  <span className="truncate">{link.title || link.url}</span>
+                </a>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Actions - Absolute positioned to prevent layout shift */}

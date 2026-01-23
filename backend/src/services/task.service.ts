@@ -2,6 +2,44 @@ import { prisma } from '../lib/db.js';
 import type { CreateTaskInput, UpdateTaskInput } from '../utils/validation.schemas.js';
 
 /**
+ * Build orderBy array for task queries based on sort options
+ */
+function buildTaskOrderBy(sortBy: string, sortOrder: 'asc' | 'desc'): any[] {
+  const orderBy: any[] = [];
+
+  // Primary sort based on user selection
+  switch (sortBy) {
+    case 'priority':
+      // Priority: URGENT > HIGH > MEDIUM > LOW (desc = urgent first)
+      orderBy.push({ priority: sortOrder });
+      orderBy.push({ dueDate: 'asc' }); // Secondary: earliest due date
+      break;
+    case 'dueDate':
+      // Due date: nulls last for asc, nulls first for desc
+      orderBy.push({ dueDate: { sort: sortOrder, nulls: sortOrder === 'asc' ? 'last' : 'first' } });
+      orderBy.push({ priority: 'desc' }); // Secondary: highest priority
+      break;
+    case 'createdAt':
+      orderBy.push({ createdAt: sortOrder });
+      break;
+    case 'title':
+      orderBy.push({ title: sortOrder });
+      break;
+    default:
+      // Default: priority desc, then due date asc
+      orderBy.push({ priority: 'desc' });
+      orderBy.push({ dueDate: 'asc' });
+  }
+
+  // Always add createdAt as final tiebreaker
+  if (sortBy !== 'createdAt') {
+    orderBy.push({ createdAt: 'desc' });
+  }
+
+  return orderBy;
+}
+
+/**
  * Get task by ID
  * Only returns the task if it belongs to the requesting user
  */
@@ -34,6 +72,17 @@ export async function getTaskById(taskId: string, userId: string) {
           },
         },
       },
+      links: {
+        select: {
+          id: true,
+          url: true,
+          title: true,
+          createdAt: true,
+        },
+        orderBy: {
+          createdAt: 'asc',
+        },
+      },
     },
   });
 
@@ -61,11 +110,13 @@ export async function listTasks(
     noteId?: string;
     tagId?: string;
     overdue?: boolean;
+    sortBy?: 'priority' | 'dueDate' | 'createdAt' | 'title';
+    sortOrder?: 'asc' | 'desc';
     limit?: number;
     offset?: number;
   }
 ) {
-  const { status, priority, folderId, noteId, tagId, overdue, limit = 50, offset = 0 } = options || {};
+  const { status, priority, folderId, noteId, tagId, overdue, sortBy = 'priority', sortOrder = 'desc', limit = 50, offset = 0 } = options || {};
 
   // Build where clause
   const where: any = { userId };
@@ -139,13 +190,19 @@ export async function listTasks(
             },
           },
         },
+        links: {
+          select: {
+            id: true,
+            url: true,
+            title: true,
+            createdAt: true,
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
       },
-      orderBy: [
-        { status: 'asc' },
-        { priority: 'desc' },
-        { dueDate: 'asc' },
-        { createdAt: 'desc' },
-      ],
+      orderBy: buildTaskOrderBy(sortBy, sortOrder),
       take: limit,
       skip: offset,
     }),
@@ -219,7 +276,16 @@ export async function createTask(userId: string, data: CreateTaskInput) {
       }));
     }
 
-    // Create task with tags
+    // Prepare links if provided
+    let linkConnections: any[] = [];
+    if (data.links && data.links.length > 0) {
+      linkConnections = data.links.map((link) => ({
+        url: link.url,
+        title: link.title || null,
+      }));
+    }
+
+    // Create task with tags and links
     const task = await tx.task.create({
       data: {
         title: data.title,
@@ -233,6 +299,9 @@ export async function createTask(userId: string, data: CreateTaskInput) {
         folderId: data.folderId || null,
         tags: {
           create: tagConnections,
+        },
+        links: {
+          create: linkConnections,
         },
       },
       include: {
@@ -256,6 +325,17 @@ export async function createTask(userId: string, data: CreateTaskInput) {
                 name: true,
               },
             },
+          },
+        },
+        links: {
+          select: {
+            id: true,
+            url: true,
+            title: true,
+            createdAt: true,
+          },
+          orderBy: {
+            createdAt: 'asc',
           },
         },
       },
@@ -349,6 +429,25 @@ export async function updateTask(taskId: string, userId: string, data: UpdateTas
       }
     }
 
+    // Handle links if provided (replace all)
+    if (data.links !== undefined) {
+      // Remove existing links
+      await tx.taskLink.deleteMany({
+        where: { taskId },
+      });
+
+      // Add new links
+      if (data.links.length > 0) {
+        await tx.taskLink.createMany({
+          data: data.links.map((link) => ({
+            taskId,
+            url: link.url,
+            title: link.title || null,
+          })),
+        });
+      }
+    }
+
     // Prepare update data
     const updateData: any = {};
     if (data.title !== undefined) updateData.title = data.title;
@@ -396,6 +495,17 @@ export async function updateTask(taskId: string, userId: string, data: UpdateTas
                 name: true,
               },
             },
+          },
+        },
+        links: {
+          select: {
+            id: true,
+            url: true,
+            title: true,
+            createdAt: true,
+          },
+          orderBy: {
+            createdAt: 'asc',
           },
         },
       },
@@ -496,4 +606,118 @@ export async function getTaskStats(userId: string) {
     completedTasks,
     overdueTasks,
   };
+}
+
+/**
+ * Add a link to a task
+ */
+export async function addTaskLink(
+  taskId: string,
+  userId: string,
+  data: { url: string; title?: string }
+) {
+  // Verify task exists and belongs to user
+  const task = await prisma.task.findFirst({
+    where: {
+      id: taskId,
+      userId,
+    },
+    include: {
+      _count: {
+        select: { links: true },
+      },
+    },
+  });
+
+  if (!task) {
+    throw new Error('Task not found');
+  }
+
+  // Check link limit (max 10)
+  if (task._count.links >= 10) {
+    throw new Error('Maximum 10 links per task');
+  }
+
+  // Create the link
+  const link = await prisma.taskLink.create({
+    data: {
+      taskId,
+      url: data.url,
+      title: data.title || null,
+    },
+    select: {
+      id: true,
+      url: true,
+      title: true,
+      createdAt: true,
+    },
+  });
+
+  return link;
+}
+
+/**
+ * Update a task link
+ */
+export async function updateTaskLink(
+  linkId: string,
+  userId: string,
+  data: { url?: string; title?: string | null }
+) {
+  // Verify link exists and belongs to user's task
+  const link = await prisma.taskLink.findFirst({
+    where: {
+      id: linkId,
+      task: {
+        userId,
+      },
+    },
+  });
+
+  if (!link) {
+    throw new Error('Link not found');
+  }
+
+  // Update the link
+  const updateData: any = {};
+  if (data.url !== undefined) updateData.url = data.url;
+  if (data.title !== undefined) updateData.title = data.title;
+
+  const updatedLink = await prisma.taskLink.update({
+    where: { id: linkId },
+    data: updateData,
+    select: {
+      id: true,
+      url: true,
+      title: true,
+      createdAt: true,
+    },
+  });
+
+  return updatedLink;
+}
+
+/**
+ * Delete a task link
+ */
+export async function deleteTaskLink(linkId: string, userId: string) {
+  // Verify link exists and belongs to user's task
+  const link = await prisma.taskLink.findFirst({
+    where: {
+      id: linkId,
+      task: {
+        userId,
+      },
+    },
+  });
+
+  if (!link) {
+    throw new Error('Link not found');
+  }
+
+  await prisma.taskLink.delete({
+    where: { id: linkId },
+  });
+
+  return { success: true };
 }

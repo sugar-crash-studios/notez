@@ -254,6 +254,9 @@ export const referencesApi = {
     api.get('/api/notes/keywords'),
 };
 
+export type TaskSortBy = 'priority' | 'dueDate' | 'createdAt' | 'title';
+export type TaskSortOrder = 'asc' | 'desc';
+
 export const tasksApi = {
   list: (params?: {
     status?: string | string[];
@@ -262,6 +265,8 @@ export const tasksApi = {
     noteId?: string;
     tagId?: string;
     overdue?: boolean;
+    sortBy?: TaskSortBy;
+    sortOrder?: TaskSortOrder;
     limit?: number;
     offset?: number;
   }) => api.get('/api/tasks', { params }),
@@ -277,6 +282,7 @@ export const tasksApi = {
     noteId?: string;
     folderId?: string;
     tags?: string[];
+    links?: Array<{ url: string; title?: string }>;
   }) => api.post('/api/tasks', data),
 
   update: (
@@ -290,6 +296,7 @@ export const tasksApi = {
       noteId?: string | null;
       folderId?: string | null;
       tags?: string[];
+      links?: Array<{ url: string; title?: string }>;
     }
   ) => api.put(`/api/tasks/${id}`, data),
 
@@ -312,6 +319,16 @@ export const tasksApi = {
     folderId?: string | null;
   }> }) =>
     api.post('/api/tasks/import', data),
+
+  // Task link management
+  addLink: (taskId: string, data: { url: string; title?: string }) =>
+    api.post(`/api/tasks/${taskId}/links`, data),
+
+  updateLink: (taskId: string, linkId: string, data: { url?: string; title?: string | null }) =>
+    api.patch(`/api/tasks/${taskId}/links/${linkId}`, data),
+
+  deleteLink: (taskId: string, linkId: string) =>
+    api.delete(`/api/tasks/${taskId}/links/${linkId}`),
 };
 
 // Feedback types

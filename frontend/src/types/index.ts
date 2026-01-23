@@ -2,6 +2,13 @@
 export type TaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 
+export interface TaskLink {
+  id: string;
+  url: string;
+  title?: string | null;
+  createdAt: string;
+}
+
 export interface Task {
   id: string;
   userId: string;
@@ -28,6 +35,7 @@ export interface Task {
     id: string;
     name: string;
   }>;
+  links?: TaskLink[];
 }
 
 export interface TaskStats {

@@ -156,6 +156,7 @@ model Task {
   note        Note?       @relation(fields: [noteId], references: [id], onDelete: Cascade)
   folder      Folder?     @relation(fields: [folderId], references: [id], onDelete: SetNull)
   tags        TaskTag[]
+  links       TaskLink[]
 
   @@index([userId, status])
   @@index([userId, dueDate])
@@ -174,6 +175,21 @@ model TaskTag {
 
   @@id([taskId, tagId])
   @@map("task_tags")
+}
+
+// Task hyperlinks (external URLs attached to tasks)
+model TaskLink {
+  id        String   @id @default(uuid())
+  taskId    String   @map("task_id")
+  url       String   @db.VarChar(2048)
+  title     String?  @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@map("task_links")
 }
 
 // Task status enum

@@ -140,6 +140,12 @@ export const aiSuggestTagsSchema = z.object({
   maxTags: z.number().int().min(1).max(20).default(5).optional(),
 });
 
+// Task link schema
+const taskLinkSchema = z.object({
+  url: z.string().url('Invalid URL').max(2048, 'URL must not exceed 2048 characters'),
+  title: z.string().max(255, 'Link title must not exceed 255 characters').optional(),
+});
+
 // Task schemas
 export const createTaskSchema = z.object({
   title: z.string().min(1, 'Title is required').max(500, 'Title must not exceed 500 characters'),
@@ -150,6 +156,7 @@ export const createTaskSchema = z.object({
   noteId: z.string().uuid('Invalid note ID').optional(),
   folderId: z.string().uuid('Invalid folder ID').optional(),
   tags: z.array(z.string().min(1).max(100)).optional(),
+  links: z.array(taskLinkSchema).max(10, 'Maximum 10 links per task').optional(),
 });
 
 export const updateTaskSchema = z.object({
@@ -161,6 +168,18 @@ export const updateTaskSchema = z.object({
   noteId: z.string().uuid('Invalid note ID').nullable().optional(),
   folderId: z.string().uuid('Invalid folder ID').nullable().optional(),
   tags: z.array(z.string().min(1).max(100)).optional(),
+  links: z.array(taskLinkSchema).max(10, 'Maximum 10 links per task').optional(),
+});
+
+// Task link management schemas
+export const addTaskLinkSchema = z.object({
+  url: z.string().url('Invalid URL').max(2048, 'URL must not exceed 2048 characters'),
+  title: z.string().max(255, 'Link title must not exceed 255 characters').optional(),
+});
+
+export const updateTaskLinkSchema = z.object({
+  url: z.string().url('Invalid URL').max(2048, 'URL must not exceed 2048 characters').optional(),
+  title: z.string().max(255, 'Link title must not exceed 255 characters').nullable().optional(),
 });
 
 export const updateTaskStatusSchema = z.object({
@@ -177,6 +196,8 @@ export const listTasksQuerySchema = z.object({
   noteId: z.string().uuid('Invalid note ID').optional(),
   tagId: z.string().uuid('Invalid tag ID').optional(),
   overdue: z.coerce.boolean().optional(),
+  sortBy: z.enum(['priority', 'dueDate', 'createdAt', 'title']).default('priority').optional(),
+  sortOrder: z.enum(['asc', 'desc']).default('desc').optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0),
 });
@@ -240,6 +261,8 @@ export type UpdateTaskStatusInput = z.infer<typeof updateTaskStatusSchema>;
 export type ListTasksQuery = z.infer<typeof listTasksQuerySchema>;
 export type ScanTasksInput = z.infer<typeof scanTasksSchema>;
 export type ImportTasksInput = z.infer<typeof importTasksSchema>;
+export type AddTaskLinkInput = z.infer<typeof addTaskLinkSchema>;
+export type UpdateTaskLinkInput = z.infer<typeof updateTaskLinkSchema>;
 export type RenameTagInput = z.infer<typeof renameTagSchema>;
 export type TagSearchQuery = z.infer<typeof tagSearchQuerySchema>;
 

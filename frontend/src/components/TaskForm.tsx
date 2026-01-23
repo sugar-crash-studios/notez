@@ -1,8 +1,14 @@
 import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, Plus, Trash2, Link2 } from 'lucide-react';
 import { tasksApi, foldersApi } from '../lib/api';
 import type { Task, TaskStatus, TaskPriority } from '../types';
 import { TagInput } from './TagInput';
+
+interface LinkInput {
+  id?: string; // Only present for existing links
+  url: string;
+  title: string;
+}
 
 interface TaskFormProps {
   task?: Task | null;
@@ -23,6 +29,7 @@ export default function TaskForm({ task, onClose, onSuccess }: TaskFormProps) {
   const [dueDate, setDueDate] = useState('');
   const [folderId, setFolderId] = useState<string>('');
   const [tags, setTags] = useState<string[]>([]);
+  const [links, setLinks] = useState<LinkInput[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -38,6 +45,7 @@ export default function TaskForm({ task, onClose, onSuccess }: TaskFormProps) {
       setDueDate(task.dueDate ? task.dueDate.split('T')[0] : '');
       setFolderId(task.folderId || '');
       setTags(task.tags?.map((t) => t.name) || []);
+      setLinks(task.links?.map((l) => ({ id: l.id, url: l.url, title: l.title || '' })) || []);
     }
   }, [task]);
 
@@ -48,6 +56,21 @@ export default function TaskForm({ task, onClose, onSuccess }: TaskFormProps) {
     } catch (error) {
       console.error('Failed to load folders:', error);
     }
+  };
+
+  const addLink = () => {
+    if (links.length >= 10) return;
+    setLinks([...links, { url: '', title: '' }]);
+  };
+
+  const removeLink = (index: number) => {
+    setLinks(links.filter((_, i) => i !== index));
+  };
+
+  const updateLink = (index: number, field: 'url' | 'title', value: string) => {
+    const newLinks = [...links];
+    newLinks[index] = { ...newLinks[index], [field]: value };
+    setLinks(newLinks);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -62,6 +85,11 @@ export default function TaskForm({ task, onClose, onSuccess }: TaskFormProps) {
     setError('');
 
     try {
+      // Filter out empty links and prepare link data
+      const validLinks = links
+        .filter((l) => l.url.trim())
+        .map((l) => ({ url: l.url.trim(), title: l.title.trim() || undefined }));
+
       const taskData: any = {
         title: title.trim(),
         description: description.trim() || undefined,
@@ -70,6 +98,7 @@ export default function TaskForm({ task, onClose, onSuccess }: TaskFormProps) {
         dueDate: dueDate ? `${dueDate}T00:00:00.000Z` : undefined,
         folderId: folderId || undefined,
         tags: tags.length > 0 ? tags : undefined,
+        links: validLinks.length > 0 ? validLinks : undefined,
       };
 
       if (task) {
@@ -220,6 +249,67 @@ export default function TaskForm({ task, onClose, onSuccess }: TaskFormProps) {
               tags={tags.map((name, index) => ({ id: `temp-${index}`, name }))}
               onChange={setTags}
             />
+          </div>
+
+          {/* Links */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                <span className="flex items-center gap-1">
+                  <Link2 className="w-4 h-4" />
+                  Links
+                </span>
+              </label>
+              {links.length < 10 && (
+                <button
+                  type="button"
+                  onClick={addLink}
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" />
+                  Add link
+                </button>
+              )}
+            </div>
+            {links.length > 0 ? (
+              <div className="space-y-2">
+                {links.map((link, index) => (
+                  <div key={index} className="flex gap-2 items-start">
+                    <div className="flex-1 space-y-1">
+                      <input
+                        type="url"
+                        value={link.url}
+                        onChange={(e) => updateLink(index, 'url', e.target.value)}
+                        placeholder="https://example.com"
+                        className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                      <input
+                        type="text"
+                        value={link.title}
+                        onChange={(e) => updateLink(index, 'title', e.target.value)}
+                        placeholder="Link title (optional)"
+                        className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeLink(index)}
+                      className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                      title="Remove link"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                No links added. Click "Add link" to attach URLs.
+              </p>
+            )}
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              {links.length}/10 links
+            </p>
           </div>
 
           {/* Note Linkback Info (if editing task linked to note) */}

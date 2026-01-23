@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Plus, Download, Filter, X } from 'lucide-react';
-import { tasksApi, foldersApi } from '../lib/api';
+import { Plus, Download, Filter, X, ArrowUpDown } from 'lucide-react';
+import { tasksApi, foldersApi, type TaskSortBy, type TaskSortOrder } from '../lib/api';
 import type { Task, TaskStats } from '../types';
 import TaskItem from './TaskItem';
 import TaskForm from './TaskForm';
@@ -27,6 +27,8 @@ export default function TaskList({ onNoteClick }: TaskListProps) {
   const [selectedFolder, setSelectedFolder] = useState<string>('');
   const [showOverdueOnly, setShowOverdueOnly] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [sortBy, setSortBy] = useState<TaskSortBy>('priority');
+  const [sortOrder, setSortOrder] = useState<TaskSortOrder>('desc');
 
   // Modals
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -37,12 +39,12 @@ export default function TaskList({ onNoteClick }: TaskListProps) {
     loadTasks();
     loadStats();
     loadFolders();
-  }, [showCompleted, selectedPriority, selectedFolder, showOverdueOnly]);
+  }, [showCompleted, selectedPriority, selectedFolder, showOverdueOnly, sortBy, sortOrder]);
 
   const loadTasks = async () => {
     setIsLoading(true);
     try {
-      const params: any = { limit: 100 };
+      const params: any = { limit: 100, sortBy, sortOrder };
 
       if (!showCompleted) {
         params.status = ['PENDING', 'IN_PROGRESS'];
@@ -274,6 +276,34 @@ export default function TaskList({ onNoteClick }: TaskListProps) {
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Sort Options */}
+            <div className="border-t border-gray-200 dark:border-gray-600 pt-3 mt-3">
+              <div className="flex items-center gap-2 mb-2">
+                <ArrowUpDown className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Sort</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as TaskSortBy)}
+                  className="px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                >
+                  <option value="priority">Priority</option>
+                  <option value="dueDate">Due Date</option>
+                  <option value="createdAt">Created</option>
+                  <option value="title">Title</option>
+                </select>
+                <select
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value as TaskSortOrder)}
+                  className="px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                >
+                  <option value="desc">{sortBy === 'title' ? 'Z-A' : sortBy === 'dueDate' ? 'Latest First' : 'High to Low'}</option>
+                  <option value="asc">{sortBy === 'title' ? 'A-Z' : sortBy === 'dueDate' ? 'Earliest First' : 'Low to High'}</option>
+                </select>
+              </div>
             </div>
           </div>
         )}
