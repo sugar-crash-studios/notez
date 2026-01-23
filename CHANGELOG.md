@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-01-22
+
+**Task Enhancements Release**
+
+This release focuses on improving the task management experience with new features for sorting, organization, and visualization, plus important bug fixes from user feedback.
+
+### Added
+
+- **Task Sorting**: Sort tasks by priority, due date, creation date, or title (ascending/descending)
+- **Inline Folder Creation**: Create new folders directly from the folder dropdown without leaving the current form
+- **Task Hyperlinks**: Attach up to 10 external URLs to tasks with optional titles
+- **Kanban Board View**: Visual drag-and-drop board for managing tasks across status columns (Pending, In Progress, Completed, Cancelled)
+- **Keyboard Navigation**: Move tasks between Kanban columns using arrow keys for accessibility
+
+### Fixed
+
+- **Task List Not Refreshing**: Task list now properly refreshes after creating, editing, or deleting tasks
+- **Task Form Not Closing**: Modal now correctly closes after successful task creation/update
+- **Overdue Badge Position**: Overdue indicator no longer causes layout shifts in task list
+- **Task Actions Visibility**: Edit/delete buttons now always visible on mobile, hover-revealed on desktop
+- **Task Edit/Delete on Mobile**: Action buttons properly sized and accessible on touch devices
+
+### Security
+
+- **URL Protocol Validation**: Task links now restricted to http/https only (blocks javascript:, data:, etc.)
+- **Task Ownership Verification**: Link update/delete routes now verify the link belongs to the specified task
+
+### Technical
+
+- New `TaskLink` model with cascade delete
+- Database indexes for priority and createdAt sorting
+- Transaction-based link limit enforcement (max 10 per task)
+- ARIA labels and roles for Kanban accessibility
+
 ## [1.0.1] - 2025-12-23
 
 **User Notifications Expansion**
@@ -310,7 +344,8 @@ All success criteria from the MVP specification have been met:
 - Docker deployment support
 - Multi-user authentication
 
-[Unreleased]: https://github.com/SpasticPalate/notez/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/SpasticPalate/notez/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/SpasticPalate/notez/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/SpasticPalate/notez/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/SpasticPalate/notez/compare/v1.0.0-rc.2...v1.0.0
 [1.0.0-rc.2]: https://github.com/SpasticPalate/notez/compare/v1.0.0-rc.1...v1.0.0-rc.2
