@@ -12,6 +12,14 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '1.14.0',
+    date: '2026-03-04',
+    added: [
+      'QR code displayed when generating API tokens — scan with a mobile app instead of copy-pasting',
+      'Token display auto-clears after 5 minutes for security, with a 30-second warning',
+    ],
+  },
+  {
     version: '1.13.0',
     date: '2026-03-01',
     added: [

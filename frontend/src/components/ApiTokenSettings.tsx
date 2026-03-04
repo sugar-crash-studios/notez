@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { tokensApi } from '../lib/api';
 import { useToast } from './Toast';
 import { useConfirm } from './ConfirmDialog';
+import { QrCodeDisplay } from './QrCodeDisplay';
 import {
   Key,
   Copy,
@@ -39,6 +40,9 @@ const EXPIRY_OPTIONS = [
   { value: '', label: 'Never' },
 ];
 
+// Auto-clear the raw token after 5 minutes for security
+const TOKEN_DISPLAY_TIMEOUT_MS = 5 * 60 * 1000;
+
 export function ApiTokenSettings() {
   const { showToast } = useToast();
   const confirm = useConfirm();
@@ -57,12 +61,20 @@ export function ApiTokenSettings() {
   // Token reveal state (shown once after creation)
   const [newTokenRaw, setNewTokenRaw] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [expiringWarning, setExpiringWarning] = useState(false);
+  // Ref to track copied state inside the auto-dismiss timer callback (avoids stale closure)
+  const copiedRef = useRef(false);
 
   // Revoke loading state
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
   // Setup guide state
   const [showGuide, setShowGuide] = useState(false);
+
+  // Keep copiedRef in sync so the auto-dismiss timer can read current copied state
+  useEffect(() => {
+    copiedRef.current = copied;
+  }, [copied]);
 
   const loadTokens = useCallback(async () => {
     try {
@@ -78,6 +90,32 @@ export function ApiTokenSettings() {
   useEffect(() => {
     loadTokens();
   }, [loadTokens]);
+
+  // Auto-clear the raw token after 5 minutes. Warn at the 30-second mark.
+  // visibilitychange is intentionally omitted — users need to switch tabs to paste the token.
+  useEffect(() => {
+    if (!newTokenRaw) return;
+
+    // Warn the user 30 seconds before the token is hidden
+    const warningTimer = setTimeout(() => {
+      setExpiringWarning(true);
+    }, TOKEN_DISPLAY_TIMEOUT_MS - 30_000);
+
+    const timer = setTimeout(() => {
+      // Clear clipboard if the user previously copied the token
+      if (copiedRef.current) {
+        navigator.clipboard.writeText('').catch(() => {});
+      }
+      setNewTokenRaw(null);
+      setExpiringWarning(false);
+    }, TOKEN_DISPLAY_TIMEOUT_MS);
+
+    return () => {
+      clearTimeout(warningTimer);
+      clearTimeout(timer);
+      setExpiringWarning(false);
+    };
+  }, [newTokenRaw]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -178,34 +216,61 @@ export function ApiTokenSettings() {
     <div className="space-y-6">
       {/* Token reveal banner */}
       {newTokenRaw && (
-        <div role="alert" className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg p-4">
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg p-4">
           <div className="flex items-start space-x-3">
             <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-amber-800 dark:text-amber-200">
-                Store this token — it won't be shown again
-              </h3>
-              <div className="mt-2 flex items-center space-x-2">
-                <code className="flex-1 bg-white dark:bg-gray-900 border border-amber-200 dark:border-amber-700 rounded px-3 py-2 text-sm font-mono text-gray-900 dark:text-gray-100 break-all select-all">
-                  {newTokenRaw}
-                </code>
-                <button
-                  onClick={() => handleCopy(newTokenRaw)}
-                  className="flex-shrink-0 p-2 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-800/30 rounded transition-colors"
-                  aria-label={copied ? 'Copied' : 'Copy token to clipboard'}
-                >
-                  {copied ? <Check className="w-5 h-5 text-green-600" /> : <Copy className="w-5 h-5" />}
-                </button>
+              {/* role="alert" on wrapper div announces only the heading, not the raw token */}
+              <div role="alert">
+                <h3 className="font-semibold text-amber-800 dark:text-amber-200">
+                  Store this token — it won't be shown again
+                </h3>
               </div>
-              <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">
-                Copy and paste this token into your Claude Code MCP settings or other integration.
-              </p>
+              {/*
+                Mobile: token+copy row appears first (order-last on QR), then QR below.
+                Desktop: QR on the left (order-first), token+copy on the right.
+              */}
+              <div className="mt-3 flex flex-col md:flex-row md:items-start gap-4">
+                <QrCodeDisplay
+                  value={newTokenRaw}
+                  caption="Scan to copy token"
+                  className="order-last md:order-first"
+                />
+                <div className="flex-1 min-w-0 order-first md:order-last">
+                  <div className="flex items-center space-x-2">
+                    <span className="sr-only">Token value available via copy button</span>
+                    <code
+                      aria-hidden="true"
+                      className="flex-1 bg-white dark:bg-gray-900 border border-amber-200 dark:border-amber-700 rounded px-3 py-2 text-sm font-mono text-gray-900 dark:text-gray-100 break-all select-all"
+                    >
+                      {newTokenRaw}
+                    </code>
+                    <button
+                      onClick={() => handleCopy(newTokenRaw)}
+                      className="flex-shrink-0 p-2 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-800/30 rounded transition-colors"
+                      aria-label={copied ? 'Copied' : 'Copy token to clipboard'}
+                    >
+                      <span className="transition-colors duration-150">
+                        {copied ? <Check className="w-5 h-5 text-green-600" /> : <Copy className="w-5 h-5" />}
+                      </span>
+                    </button>
+                  </div>
+                  <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">
+                    Copy this token or scan the QR code with a compatible mobile app.
+                  </p>
+                </div>
+              </div>
               <button
                 onClick={() => setNewTokenRaw(null)}
-                className="mt-2 text-sm text-amber-600 dark:text-amber-400 hover:underline"
+                className="mt-3 inline-flex items-center px-3 py-1.5 border border-amber-300 dark:border-amber-600 rounded-md text-sm font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-800/30 transition-colors"
               >
-                Dismiss
+                I've saved this token
               </button>
+              {expiringWarning && (
+                <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+                  Token will be hidden soon — save it now.
+                </p>
+              )}
             </div>
           </div>
         </div>

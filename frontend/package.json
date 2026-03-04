@@ -1,7 +1,7 @@
 {
   "name": "notez-frontend",
   "private": true,
-  "version": "1.13.0",
+  "version": "1.14.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -31,6 +31,7 @@
     "dompurify": "^3.3.0",
     "lucide-react": "^0.556.0",
     "marked": "^16.4.1",
+    "qrcode.react": "^4.2.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-markdown": "^9.0.2",

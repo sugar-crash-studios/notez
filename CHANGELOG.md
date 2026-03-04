@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-03-04
+
+### Added
+
+- **QR code on token generation**: When creating an API token, a scannable QR code is displayed alongside the copy button, enabling mobile apps (e.g., PAM) to capture the token by scanning instead of manual paste.
+- **Token auto-dismiss**: Token reveal banner auto-clears after 5 minutes with a 30-second warning. Clipboard is cleared on expiry if the token was copied.
+- **QR accessibility**: Proper SVG title, screen-reader-friendly token display with `aria-hidden` code block and sr-only label, scoped `role="alert"` on heading only.
+- **Responsive QR layout**: Side-by-side on desktop (QR left, token right), stacked on mobile (copy action first, QR below).
+
 ## [1.13.0] - 2026-03-01
 
 ### Added
