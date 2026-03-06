@@ -207,7 +207,8 @@ await fastify.register(notificationsRoutes, { prefix: '/api' }); // User notific
 await fastify.register(collaborationRoutes, { prefix: '/api' }); // Real-time collaboration WebSocket
 await fastify.register(adminRoutes, { prefix: '/api' }); // Admin service account endpoints
 await fastify.register(tokenRoutes, { prefix: '/api' }); // API token management
-await fastify.register(mcpRoutes, { prefix: '/api/mcp' }); // MCP API endpoints
+await fastify.register(mcpRoutes, { prefix: '/api/mcp' }); // MCP API endpoints (legacy — kept for backwards compatibility)
+await fastify.register(mcpRoutes, { prefix: '/api/v1' });  // Versioned external API
 
 // Serve frontend static files (in production)
 // Get the directory of the current module

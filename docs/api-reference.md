@@ -20,9 +20,9 @@ Most endpoints use JWT session auth.
 - **Access token** — Short-lived JWT, sent as `Authorization: Bearer {token}` header.
 - **Refresh token** — Long-lived (7 days), stored as a signed HttpOnly cookie (`refreshToken`). Automatically rotated on each refresh.
 
-### API Token Authentication (MCP / Service Accounts)
+### API Token Authentication (External / Service Accounts)
 
-The `/api/mcp/*` routes use API tokens instead of session JWTs.
+The `/api/v1/*` routes use API tokens instead of session JWTs. (`/api/mcp/*` is a legacy alias.)
 
 - **Header:** `Authorization: Bearer ntez_{token}`
 - Tokens are scoped (`read`, `write`) and may have expiry dates.
@@ -1828,9 +1828,13 @@ POST /api/admin/notifications/release
 
 ---
 
-## MCP API
+## External API (v1)
 
-Used by the `notez-mcp` stdio server. Authenticated via API token (`Authorization: Bearer ntez_{token}`). All routes are under `/api/mcp/`.
+Authenticated via API token (`Authorization: Bearer ntez_{token}`). Use this for all programmatic integrations — scripts, the MCP server, hello-pam, etc.
+
+**Base path:** `/api/v1/`
+
+> `/api/mcp/` is a legacy alias kept for backwards compatibility while existing MCP clients migrate. New integrations should use `/api/v1/`.
 
 Rate limit: 120 requests/minute per token.
 
@@ -1845,18 +1849,18 @@ Rate limit: 120 requests/minute per token.
 
 | Method | Path | Scope | Description |
 |--------|------|-------|-------------|
-| `GET` | `/api/mcp/notes/search?q={query}&limit={n}` | read | Search notes by keyword |
-| `GET` | `/api/mcp/notes/by-title?title={text}` | read | Get note by exact title (case-insensitive); includes `plainText` field |
-| `GET` | `/api/mcp/notes/recent?limit={n}&offset={n}` | read | List recently modified notes |
-| `GET` | `/api/mcp/notes?folderId={id}&tagId={id}&search={q}&limit={n}&offset={n}` | read | List notes with filters |
-| `GET` | `/api/mcp/notes/:id` | read | Get note by ID; includes `plainText` field (HTML stripped) |
-| `POST` | `/api/mcp/notes` | write | Create a note |
-| `PATCH` | `/api/mcp/notes/:id` | write | Update note (title, content, folder, tags) |
-| `PATCH` | `/api/mcp/notes/:id/append` | write | Append content to a note (max 50KB per call; note max 500KB) |
-| `DELETE` | `/api/mcp/notes/:id` | write | Soft-delete note (to trash) |
-| `POST` | `/api/mcp/notes/:id/restore` | write | Restore note from trash |
+| `GET` | `/api/v1/notes/search?q={query}&limit={n}` | read | Search notes by keyword |
+| `GET` | `/api/v1/notes/by-title?title={text}` | read | Get note by exact title (case-insensitive); includes `plainText` field |
+| `GET` | `/api/v1/notes/recent?limit={n}&offset={n}` | read | List recently modified notes |
+| `GET` | `/api/v1/notes?folderId={id}&tagId={id}&search={q}&limit={n}&offset={n}` | read | List notes with filters |
+| `GET` | `/api/v1/notes/:id` | read | Get note by ID; includes `plainText` field (HTML stripped) |
+| `POST` | `/api/v1/notes` | write | Create a note |
+| `PATCH` | `/api/v1/notes/:id` | write | Update note (title, content, folder, tags) |
+| `PATCH` | `/api/v1/notes/:id/append` | write | Append content to a note (max 50KB per call; note max 500KB) |
+| `DELETE` | `/api/v1/notes/:id` | write | Soft-delete note (to trash) |
+| `POST` | `/api/v1/notes/:id/restore` | write | Restore note from trash |
 
-**Note:** `/api/mcp/notes/:id` GET responses include a `plainText` field with HTML stripped, for AI consumption.
+**Note:** `/api/v1/notes/:id` GET responses include a `plainText` field with HTML stripped, for AI consumption.
 
 **Create note body:**
 ```json
@@ -1879,12 +1883,12 @@ Rate limit: 120 requests/minute per token.
 
 | Method | Path | Scope | Description |
 |--------|------|-------|-------------|
-| `GET` | `/api/mcp/tasks?status={s}&limit={n}` | read | List tasks (sorted by priority desc) |
-| `GET` | `/api/mcp/tasks/:id` | read | Get task by ID |
-| `POST` | `/api/mcp/tasks` | write | Create a task |
-| `PATCH` | `/api/mcp/tasks/:id/status` | write | Update task status |
-| `PATCH` | `/api/mcp/tasks/:id` | write | Update task (title, description, priority, dueDate, folder, tags) |
-| `DELETE` | `/api/mcp/tasks/:id` | write | Delete a task |
+| `GET` | `/api/v1/tasks?status={s}&limit={n}` | read | List tasks (sorted by priority desc) |
+| `GET` | `/api/v1/tasks/:id` | read | Get task by ID |
+| `POST` | `/api/v1/tasks` | write | Create a task |
+| `PATCH` | `/api/v1/tasks/:id/status` | write | Update task status |
+| `PATCH` | `/api/v1/tasks/:id` | write | Update task (title, description, priority, dueDate, folder, tags) |
+| `DELETE` | `/api/v1/tasks/:id` | write | Delete a task |
 
 **Create task body:**
 ```json
@@ -1897,10 +1901,10 @@ Rate limit: 120 requests/minute per token.
 
 | Method | Path | Scope | Description |
 |--------|------|-------|-------------|
-| `GET` | `/api/mcp/folders` | read | List all folders |
-| `POST` | `/api/mcp/folders` | write | Create a folder |
-| `PATCH` | `/api/mcp/folders/:id` | write | Update/rename a folder |
-| `DELETE` | `/api/mcp/folders/:id` | write | Delete a folder |
+| `GET` | `/api/v1/folders` | read | List all folders |
+| `POST` | `/api/v1/folders` | write | Create a folder |
+| `PATCH` | `/api/v1/folders/:id` | write | Update/rename a folder |
+| `DELETE` | `/api/v1/folders/:id` | write | Delete a folder |
 
 ---
 
@@ -1908,17 +1912,17 @@ Rate limit: 120 requests/minute per token.
 
 | Method | Path | Scope | Description |
 |--------|------|-------|-------------|
-| `GET` | `/api/mcp/tags` | read | List all tags |
-| `PATCH` | `/api/mcp/tags/:id` | write | Rename a tag |
-| `DELETE` | `/api/mcp/tags/:id` | write | Delete a tag |
+| `GET` | `/api/v1/tags` | read | List all tags |
+| `PATCH` | `/api/v1/tags/:id` | write | Rename a tag |
+| `DELETE` | `/api/v1/tags/:id` | write | Delete a tag |
 
 ---
 
-### Sharing (MCP)
+### Sharing
 
 | Method | Path | Scope | Description |
 |--------|------|-------|-------------|
-| `POST` | `/api/mcp/notes/:id/shares` | write | Share a note |
-| `GET` | `/api/mcp/notes/:id/shares` | read | List shares for a note |
-| `PATCH` | `/api/mcp/notes/:id/shares/:shareId` | write | Update share permission |
-| `DELETE` | `/api/mcp/notes/:id/shares/:shareId` | write | Remove a share |
+| `POST` | `/api/v1/notes/:id/shares` | write | Share a note |
+| `GET` | `/api/v1/notes/:id/shares` | read | List shares for a note |
+| `PATCH` | `/api/v1/notes/:id/shares/:shareId` | write | Update share permission |
+| `DELETE` | `/api/v1/notes/:id/shares/:shareId` | write | Remove a share |
