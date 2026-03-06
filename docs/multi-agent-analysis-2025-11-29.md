@@ -426,9 +426,8 @@ jobs:
 ### Recommended Reading Order
 
 1. This document (summary)
-2. [Testing Gaps](brownfield/testing-gaps.md) - Detailed testing plan
-3. [API Reference](brownfield/api-reference.md) - Full API documentation
-4. [Development Patterns](brownfield/development-patterns.md) - Code conventions
+2. [API Reference](api-reference.md) - Full API documentation
+3. [Development Patterns](development-patterns.md) - Code conventions
 
 ---
 

@@ -358,9 +358,8 @@ AdminSettings {
 ## References
 
 - **UX Mockup:** [temp/feature-request-ux-mockup.html](../temp/feature-request-ux-mockup.html)
-- **Brownfield Docs:** [docs/brownfield/](./brownfield/)
-- **Existing API Reference:** [docs/brownfield/api-reference.md](./brownfield/api-reference.md)
-- **Data Model Reference:** [docs/brownfield/data-model.md](./brownfield/data-model.md)
+- **Existing API Reference:** [docs/api-reference.md](./api-reference.md)
+- **Data Model Reference:** [docs/data-model.md](./data-model.md)
 
 ---
 
