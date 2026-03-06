@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.15.0] - 2026-03-06
+
+### Added
+
+- **Versioned external API**: All API token-authenticated routes are now available at `/api/v1/` in addition to the existing `/api/mcp/` path. `/api/mcp/` is kept as a legacy alias for backwards compatibility while existing clients migrate.
+
+### Changed
+
+- **API reference documentation**: Rewrote `docs/api-reference.md` to cover the full API surface (previously missing ~half the endpoints). Moved from `docs/brownfield/` to `docs/` root along with `data-model.md` and `development-patterns.md`. Removed stale BMAD process artifacts.
+
 ## [1.14.0] - 2026-03-04
 
 ### Added

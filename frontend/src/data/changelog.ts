@@ -12,6 +12,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '1.15.0',
+    date: '2026-03-06',
+    added: [
+      'API tokens now work at /api/v1/ — a stable, versioned endpoint for external integrations',
+    ],
+  },
+  {
     version: '1.14.0',
     date: '2026-03-04',
     added: [
