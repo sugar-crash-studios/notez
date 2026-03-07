@@ -15,6 +15,7 @@ import Typography from '@tiptap/extension-typography';
 import type { Extensions } from '@tiptap/react';
 import { ImageUploadExtension } from './TiptapImageExtension';
 import { WikiLink } from './WikiLinkExtension';
+import { CodeBlockExtension } from './CodeBlockExtension';
 
 interface BaseExtensionOptions {
   placeholder?: string;
@@ -43,6 +44,9 @@ export function getBaseExtensions({
       // StarterKit v3 includes Link by default — disable to avoid duplicate
       // with our explicit Link extension below.
       link: false,
+      // Disable built-in codeBlock — replaced by CodeBlockExtension which
+      // adds a React node view with a copy button.
+      codeBlock: false,
       // In collaborative mode, Collaboration extension provides its own
       // undo/redo via yUndoPlugin. Disable StarterKit's to prevent conflicts.
       ...(collaborative ? { undoRedo: false } : {}),
@@ -73,6 +77,7 @@ export function getBaseExtensions({
     WikiLink.configure({
       onWikiLinkClick: onWikiLinkClick ?? (() => {}),
     }),
+    CodeBlockExtension,
   ];
 }
 

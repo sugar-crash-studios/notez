@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-03-07
+
+### Added
+
+- **Code block copy button**: Each fenced code block in the editor now displays a "Copy" button in the top-right corner on hover. Button shows "Copied!" on success or "Failed" if the clipboard API is unavailable. Accessible via keyboard (`:focus-visible`) with screen reader announcements via `aria-live`.
+
 ## [1.15.0] - 2026-03-06
 
 ### Added

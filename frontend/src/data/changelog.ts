@@ -12,6 +12,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '1.16.0',
+    date: '2026-03-07',
+    added: [
+      'Click-to-copy button on code blocks — hover over any code block to reveal a Copy button',
+    ],
+  },
+  {
     version: '1.15.0',
     date: '2026-03-06',
     added: [

@@ -103,7 +103,16 @@ Track note changes and enable restore:
 - Simple diff view
 - One-click restore
 
-### 2.4 Image Improvements
+### 2.4 Code Block Enhancements
+
+**Status:** Partially Complete
+**Priority:** Medium
+
+- [x] Click-to-copy button on code blocks (v1.16.0)
+- [ ] Syntax highlighting with language detection (lowlight / highlight.js integration)
+- [ ] Language label displayed in code block header
+
+### 2.5 Image Improvements
 
 **Status:** Partially Complete
 **Priority:** Medium
