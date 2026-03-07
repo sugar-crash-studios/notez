@@ -389,6 +389,15 @@ a clean refactor is required rather than incremental modification.
 7. **Both:** Remove `@tiptap/extension-code-block` from deps once both sides are migrated — keeping the old package installed alongside lowlight risks version drift.
 
 **Note:** `CodeBlockLowlight` and `CodeBlock` are **not** drop-in replacements. The lowlight variant registers an extra ProseMirror decoration plugin and has different constructor options. Incremental/partial migration is not safe — migrate both sides together in one PR.
+
+**Pre-migration refactor recommended:** Before the lowlight migration, split `CodeBlockExtension.tsx` into two files:
+- `CodeBlockView.tsx` — the React node view component + constants (copy-button UI)
+- `CodeBlockExtension.ts` — thin wiring file: `BaseClass.extend({ addNodeView() { ... } })`
+
+This follows the existing `ImageUploadExtension.ts` / `ResizableImage.tsx` pattern. It means the lowlight migration only edits two lines in the wiring file rather than touching the entire copy-button UI.
+
+**Known residual limitation:** `UNSAFE_UNICODE_RE` strips direction-control and invisible characters but does NOT strip homoglyph / confusable characters (e.g., Cyrillic `а` for Latin `a`, Mathematical Alphanumeric Symbols U+1D400–U+1D7FF). A note author who controls content could embed visually similar characters into a code block to make the copied command differ from what is displayed. Full homoglyph normalization would break legitimate multilingual code; this risk is accepted and documented here.
+
 **Status:** Deferred — tracked for syntax highlighting milestone
 
 ---

@@ -138,6 +138,26 @@ describe('CodeBlockView', () => {
     expect(screen.getByTestId('copy-feedback')).toHaveTextContent('');
   });
 
+  it('does not write to clipboard when content is entirely sanitizable characters', async () => {
+    // A block of only zero-width spaces passes text.trim() (U+200B is not a
+    // whitespace char in trim()) but produces "" after UNSAFE_UNICODE_RE strips it.
+    // Writing "" and showing "Copied!" would be misleading.
+    const onlyInvisible = '\u200B\u200C\u200D\uFEFF';
+    const props = makeProps({
+      node: { textContent: onlyInvisible } as NodeViewProps['node'],
+    });
+
+    render(<CodeBlockView {...props} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /copy code/i }));
+    });
+
+    expect(writeTextMock).not.toHaveBeenCalled();
+    expect(screen.getByRole('button')).toHaveTextContent('Copy');
+    expect(screen.getByTestId('copy-feedback')).toHaveTextContent('');
+  });
+
   it('strips bidi/zero-width characters before writing to clipboard', async () => {
     const poisoned = 'safe\u202Ehidden\u200Btext';
     const props = makeProps({

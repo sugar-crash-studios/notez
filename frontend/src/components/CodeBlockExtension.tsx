@@ -98,6 +98,11 @@ export function CodeBlockView({ node, getPos, editor }: NodeViewProps) {
     // Strip pastejacking characters before writing to clipboard.
     const sanitized = text.replace(UNSAFE_UNICODE_RE, '');
 
+    // Guard: if the block contained *only* sanitizable characters (e.g., pure
+    // zero-width spaces that pass .trim()), sanitized is now "". Writing "" to
+    // the clipboard and showing "Copied!" would be misleading.
+    if (!sanitized.trim()) return;
+
     // Show a loading indicator for very large blocks so the user knows the
     // synchronous textContent traversal has completed and the write is pending.
     if (text.length > LARGE_BLOCK_THRESHOLD) {
