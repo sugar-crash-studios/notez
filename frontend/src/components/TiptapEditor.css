@@ -438,8 +438,10 @@
   }
 }
 
-/* aria-disabled keeps the button in the AT tree (unlike `disabled`);
-   pointer-events:none prevents mouse activation, matching the JS guard. */
+/* aria-disabled keeps the button in the AT tree (unlike `disabled`).
+   pointer-events:none prevents mouse activation.
+   Keyboard activation (Enter/Space) is prevented by the JS guard in handleCopy —
+   pointer-events has no effect on keyboard events. */
 .code-block-copy-btn[aria-disabled="true"] {
   cursor: default;
   pointer-events: none;

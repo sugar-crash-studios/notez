@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { CodeBlockView, LARGE_BLOCK_THRESHOLD } from './CodeBlockExtension';
+import { CodeBlockView, LARGE_BLOCK_THRESHOLD, LABEL_PREVIEW_LENGTH } from './CodeBlockExtension';
 import type { NodeViewProps } from '@tiptap/react';
 
 // ---------------------------------------------------------------------------
@@ -77,10 +77,13 @@ describe('CodeBlockView', () => {
     vi.clearAllMocks();
   });
 
-  it('renders a Copy button in idle state', () => {
+  it('renders a Copy button in idle state without aria-disabled', () => {
     render(<CodeBlockView {...makeProps()} />);
-    // aria-label in idle includes a code preview — /copy code/i still matches.
-    expect(screen.getByRole('button', { name: /copy code/i })).toBeInTheDocument();
+    const btn = screen.getByRole('button', { name: /copy code/i });
+    expect(btn).toBeInTheDocument();
+    // aria-disabled is omitted entirely in idle — aria-disabled="false" would
+    // trigger "dimmed" announcements in some AT implementations.
+    expect(btn).not.toHaveAttribute('aria-disabled');
   });
 
   it('shows "Copied!" and announces to screen readers after a successful copy', async () => {
@@ -96,6 +99,7 @@ describe('CodeBlockView', () => {
       expect(screen.getByRole('button')).toHaveTextContent('Copied!');
     });
 
+    expect(screen.getByRole('button')).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByTestId('copy-feedback')).toHaveTextContent('Copied to clipboard');
   });
 
@@ -113,6 +117,7 @@ describe('CodeBlockView', () => {
       expect(screen.getByRole('button')).toHaveTextContent('Copy failed');
     });
 
+    expect(screen.getByRole('button')).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByTestId('copy-feedback')).toHaveTextContent('Copy failed');
   });
 
@@ -162,7 +167,10 @@ describe('CodeBlockView', () => {
       expect(screen.getByRole('button')).toHaveTextContent('Copied!');
     });
 
-    // Button is aria-disabled — handleCopy's early-return guard also fires.
+    // Button must carry aria-disabled="true" while active.
+    expect(screen.getByRole('button')).toHaveAttribute('aria-disabled', 'true');
+
+    // handleCopy's early-return guard fires — a second click is a no-op.
     await act(async () => {
       fireEvent.click(screen.getByRole('button'));
     });
@@ -199,6 +207,68 @@ describe('CodeBlockView', () => {
     expect(writeTextMock).toHaveBeenCalledWith(freshContent);
   });
 
+  it('reads fresh text when getPos() returns 0 (falsy but valid position)', async () => {
+    // getPos() === 0 must not be treated as "no position" — 0 is the valid
+    // root position in a ProseMirror document.
+    const freshContent = 'content at position zero';
+    const mockEditor = {
+      state: {
+        doc: {
+          nodeAt: vi.fn().mockReturnValue({
+            textContent: freshContent,
+            type: { name: 'codeBlock' },
+          }),
+        },
+      },
+    };
+
+    const props = makeProps({
+      editor: mockEditor as unknown as NodeViewProps['editor'],
+      node: { textContent: 'stale content' } as NodeViewProps['node'],
+      getPos: vi.fn().mockReturnValue(0),
+    });
+
+    render(<CodeBlockView {...props} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /copy code/i }));
+      await Promise.resolve();
+    });
+
+    expect(writeTextMock).toHaveBeenCalledWith(freshContent);
+  });
+
+  it('strips bidi chars from fresh node content when fresh node is used', async () => {
+    // Verifies sanitization runs on the fresh node's textContent, not the
+    // stale prop — tests the composition of fresh-read + sanitization.
+    const poisonedFresh = 'fresh\u202Epoisoned\u200Btext';
+    const mockEditor = {
+      state: {
+        doc: {
+          nodeAt: vi.fn().mockReturnValue({
+            textContent: poisonedFresh,
+            type: { name: 'codeBlock' },
+          }),
+        },
+      },
+    };
+
+    const props = makeProps({
+      editor: mockEditor as unknown as NodeViewProps['editor'],
+      node: { textContent: 'stale content' } as NodeViewProps['node'],
+      getPos: vi.fn().mockReturnValue(42),
+    });
+
+    render(<CodeBlockView {...props} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /copy code/i }));
+      await Promise.resolve();
+    });
+
+    expect(writeTextMock).toHaveBeenCalledWith('freshpoisonedtext');
+  });
+
   it('falls back to stale node when nodeAt returns a non-codeBlock node type', async () => {
     // Defensive guard: if the document was restructured between render and click,
     // nodeAt may return a paragraph or other node at the old position.
@@ -231,8 +301,10 @@ describe('CodeBlockView', () => {
   });
 
   it('falls back to stale node when getPos is not a function', async () => {
+    // 42 is a realistic non-function value (e.g., getPos provided as a number
+    // rather than a factory in some TipTap internal paths).
     const props = makeProps({
-      getPos: undefined as unknown as NodeViewProps['getPos'],
+      getPos: 42 as unknown as NodeViewProps['getPos'],
       node: { textContent: 'fallback content' } as NodeViewProps['node'],
     });
 
@@ -246,7 +318,10 @@ describe('CodeBlockView', () => {
     expect(writeTextMock).toHaveBeenCalledWith('fallback content');
   });
 
-  it('shows "Copying…" for large blocks and announces via live region', async () => {
+  it('shows "Copying…" for large blocks but does NOT announce via live region', async () => {
+    // The live region omits 'copying' intentionally — the button label change
+    // already conveys the state, and announcing via live region simultaneously
+    // causes double-announcement in some AT.
     const largeContent = 'x'.repeat(LARGE_BLOCK_THRESHOLD + 1);
     const props = makeProps({
       node: { textContent: largeContent } as NodeViewProps['node'],
@@ -265,7 +340,9 @@ describe('CodeBlockView', () => {
     await waitFor(() => {
       expect(screen.getByRole('button')).toHaveTextContent('Copying…');
     });
-    expect(screen.getByTestId('copy-feedback')).toHaveTextContent('Copying…');
+    expect(screen.getByRole('button')).toHaveAttribute('aria-disabled', 'true');
+    // Live region is silent during 'copying' to avoid double-announcement.
+    expect(screen.getByTestId('copy-feedback')).toHaveTextContent('');
 
     // Resolve the write and confirm we transition to 'Copied!'.
     await act(async () => {
@@ -275,6 +352,71 @@ describe('CodeBlockView', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('button')).toHaveTextContent('Copied!');
+    });
+    expect(screen.getByTestId('copy-feedback')).toHaveTextContent('Copied to clipboard');
+  });
+
+  it('aria-label contains a sanitized code preview in idle state', () => {
+    const content = 'const x = 1;';
+    render(<CodeBlockView {...makeProps({ node: { textContent: content } as NodeViewProps['node'] })} />);
+    // aria-label in idle includes up to LABEL_PREVIEW_LENGTH chars of code preview.
+    const btn = screen.getByRole('button');
+    expect(btn).toHaveAttribute('aria-label', `Copy code: ${content}`);
+  });
+
+  it('aria-label matches visible button text in "copied" state', async () => {
+    render(<CodeBlockView {...makeProps()} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /copy code/i }));
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button')).toHaveTextContent('Copied!');
+    });
+
+    // Label must match visible text (WCAG 2.5.3).
+    expect(screen.getByRole('button')).toHaveAttribute('aria-label', 'Copied to clipboard');
+  });
+
+  it('aria-label matches visible button text in "failed" state', async () => {
+    writeTextMock.mockRejectedValue(new DOMException('NotAllowedError'));
+    render(<CodeBlockView {...makeProps()} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /copy code/i }));
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button')).toHaveTextContent('Copy failed');
+    });
+
+    expect(screen.getByRole('button')).toHaveAttribute('aria-label', 'Copy failed');
+  });
+
+  it('aria-label matches visible button text in "copying" state', async () => {
+    const largeContent = 'x'.repeat(LARGE_BLOCK_THRESHOLD + 1);
+    let resolveClipboard!: () => void;
+    writeTextMock.mockReturnValue(new Promise<void>(r => { resolveClipboard = r; }));
+
+    render(<CodeBlockView {...makeProps({ node: { textContent: largeContent } as NodeViewProps['node'] })} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /copy code/i }));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button')).toHaveTextContent('Copying…');
+    });
+
+    expect(screen.getByRole('button')).toHaveAttribute('aria-label', 'Copying code');
+
+    // Clean up — resolve so the component settles before unmount.
+    await act(async () => {
+      resolveClipboard();
+      await Promise.resolve();
     });
   });
 
@@ -289,11 +431,13 @@ describe('CodeBlockView', () => {
       fireEvent.click(screen.getByRole('button', { name: /copy code/i }));
     });
 
+    // Set up spy BEFORE unmount so it covers the full post-unmount resolution.
+    const consoleError = vi.spyOn(console, 'error');
+
     // Unmount while the clipboard write is still pending.
     unmount();
 
     // Resolve after unmount — mountedRef guard must suppress setCopyState.
-    const consoleError = vi.spyOn(console, 'error');
     await act(async () => {
       resolveClipboard();
       await Promise.resolve();
@@ -309,7 +453,13 @@ describe('CodeBlockView', () => {
   // cannot leak into other tests if an assertion throws mid-test.
   // -------------------------------------------------------------------------
   describe('reset timer', () => {
-    beforeEach(() => vi.useFakeTimers());
+    beforeEach(() => {
+      vi.useFakeTimers();
+      // Explicitly reset mock implementation in each nested test so that
+      // mockRejectedValue set in one test cannot bleed into the next even if
+      // test ordering or setup changes.
+      writeTextMock.mockResolvedValue(undefined);
+    });
     afterEach(() => vi.useRealTimers());
 
     it('resets to idle 3 s after "Copied!" state', async () => {
@@ -347,6 +497,30 @@ describe('CodeBlockView', () => {
       });
 
       expect(screen.getByRole('button')).toHaveTextContent('Copy');
+    });
+
+    it('transitions "copying" to "failed" after 10 s if clipboard promise never settles', async () => {
+      // Simulate a frozen clipboard permission dialog — the promise never resolves.
+      writeTextMock.mockReturnValue(new Promise<void>(() => {}));
+
+      const largeContent = 'x'.repeat(LARGE_BLOCK_THRESHOLD + 1);
+      render(<CodeBlockView {...makeProps({ node: { textContent: largeContent } as NodeViewProps['node'] })} />);
+
+      // setCopyState('copying') fires synchronously (before the first await in
+      // handleCopy). act() flushes that batch — no waitFor needed, which would
+      // deadlock when timers are faked.
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /copy code/i }));
+      });
+
+      expect(screen.getByRole('button')).toHaveTextContent('Copying…');
+
+      // Safety timeout fires after 10 s.
+      await act(async () => {
+        vi.advanceTimersByTime(10_100);
+      });
+
+      expect(screen.getByRole('button')).toHaveTextContent('Copy failed');
     });
   });
 });

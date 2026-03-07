@@ -13,6 +13,8 @@ import { Copy } from 'lucide-react';
 //   • Tag characters (SMP):           U+E0000–E007F  (invisible, survive textContent reads)
 //   • Variation selectors (SMP):      U+E0100–E01EF
 // The `u` flag is required for the \u{…} supplementary-plane escapes.
+// CAUTION: the `g` flag makes this a stateful regex. Only use with .replace() —
+// never pass to .test() or .exec(), which advance lastIndex and corrupt subsequent calls.
 const UNSAFE_UNICODE_RE =
   /[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF\uFE00-\uFE0F\u2028\u2029\uFFF9-\uFFFB\u{E0000}-\u{E007F}\u{E0100}-\u{E01EF}]/gu;
 
@@ -27,8 +29,9 @@ const BTN_STATE_CLASS: Record<Exclude<CopyState, 'idle'>, string> = {
 };
 
 /** Characters of code included in the button's accessible label to distinguish
- *  identically-named "Copy code" buttons when multiple code blocks are present. */
-const LABEL_PREVIEW_LENGTH = 40;
+ *  identically-named "Copy code" buttons when multiple code blocks are present.
+ *  Exported so tests can assert the exact truncation boundary. */
+export const LABEL_PREVIEW_LENGTH = 40;
 
 /** Show a visible "Copying…" state for blocks above this threshold so the user
  *  knows the synchronous textContent traversal has completed and the clipboard
@@ -42,7 +45,11 @@ export function CodeBlockView({ node, getPos, editor }: NodeViewProps) {
   // Track mount state to guard async setCopyState calls — the clipboard promise
   // may resolve after the component has unmounted (e.g., user navigates away
   // mid-copy of a large block).
+  // `mountedRef.current = true` is set in the effect body (not only at useRef)
+  // so that React 18 Strict Mode's double-invoke (mount → cleanup → remount)
+  // re-arms the guard on the second mount instead of leaving it permanently false.
   useEffect(() => {
+    mountedRef.current = true;
     return () => { mountedRef.current = false; };
   }, []);
 
@@ -54,6 +61,17 @@ export function CodeBlockView({ node, getPos, editor }: NodeViewProps) {
     const id = setTimeout(() => {
       if (mountedRef.current) setCopyState('idle');
     }, 3000);
+    return () => clearTimeout(id);
+  }, [copyState]);
+
+  // Safety timeout for the 'copying' state — some browsers freeze the clipboard
+  // permission dialog indefinitely, leaving the promise unresolved. After 10 s,
+  // transition to 'failed' so the button is not permanently inert.
+  useEffect(() => {
+    if (copyState !== 'copying') return;
+    const id = setTimeout(() => {
+      if (mountedRef.current) setCopyState('failed');
+    }, 10_000);
     return () => clearTimeout(id);
   }, [copyState]);
 
@@ -127,30 +145,36 @@ export function CodeBlockView({ node, getPos, editor }: NodeViewProps) {
       <pre>
         <NodeViewContent<'code'> as="code" />
       </pre>
-      {/* aria-disabled keeps the button in the accessibility tree during active
-          states — `disabled` would remove it entirely, making it unfindable by
-          screen readers. The handleCopy guard prevents re-entrancy. */}
+      {/* aria-disabled={isActive || undefined} omits the attribute entirely in
+          idle state — aria-disabled="false" is spec-valid but triggers "dimmed"
+          announcements in some AT implementations. During active states,
+          aria-disabled="true" keeps the button in the AT tree while signalling
+          it is not operable. Keyboard re-entrancy is handled by the JS guard in
+          handleCopy; pointer-events:none in CSS handles mouse. */}
       <button
         type="button"
         className={`code-block-copy-btn${stateClass}`}
         onClick={handleCopy}
-        aria-disabled={isActive}
+        aria-disabled={isActive || undefined}
         aria-label={ariaLabel}
       >
         {buttonContent}
       </button>
-      {/* Proactive screen-reader announcement for state changes. role="status"
-          is omitted — it implies persistent state, not transient feedback.
-          aria-atomic is omitted — it has no practical effect on a single flat
-          text node and would mislead maintainers about structural complexity. */}
+      {/* Proactive screen-reader announcement for terminal state changes.
+          aria-relevant="additions" suppresses VoiceOver's re-evaluation when
+          the region is cleared back to "" on idle — we only want AT to announce
+          when text is added, not when it is removed.
+          'copying' is omitted intentionally: the button label change conveys
+          that state visually and some AT would double-announce if the live
+          region fired simultaneously. */}
       <span
         aria-live="polite"
+        aria-relevant="additions"
         data-testid="copy-feedback"
         className="sr-only"
       >
-        {copyState === 'copied'  ? 'Copied to clipboard' :
-         copyState === 'failed'  ? 'Copy failed' :
-         copyState === 'copying' ? 'Copying…' : ''}
+        {copyState === 'copied' ? 'Copied to clipboard' :
+         copyState === 'failed' ? 'Copy failed' : ''}
       </span>
     </NodeViewWrapper>
   );

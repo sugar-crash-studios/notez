@@ -5,6 +5,10 @@
  *
  * This eliminates config divergence between the two editors.
  * Any extension added, removed, or reconfigured here applies to both.
+ *
+ * Note: StarterKit is configured with `codeBlock: false` to prevent the
+ * built-in CodeBlock from registering. CodeBlockExtension (which adds the
+ * copy button node view) is registered explicitly instead.
  */
 import StarterKit from '@tiptap/starter-kit';
 import TaskList from '@tiptap/extension-task-list';
