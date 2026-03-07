@@ -376,12 +376,20 @@ describe('CodeBlockView', () => {
     expect(screen.getByTestId('copy-feedback')).toHaveTextContent('Copied to clipboard');
   });
 
-  it('aria-label contains a sanitized code preview in idle state', () => {
-    const content = 'const x = 1;';
-    render(<CodeBlockView {...makeProps({ node: { textContent: content } as NodeViewProps['node'] })} />);
-    // aria-label in idle includes up to LABEL_PREVIEW_LENGTH chars of code preview.
-    const btn = screen.getByRole('button');
-    expect(btn).toHaveAttribute('aria-label', `Copy code: ${content}`);
+  it('aria-label contains a sanitized code preview in idle state, truncated to LABEL_PREVIEW_LENGTH', () => {
+    // Short content — label includes the full text.
+    const shortContent = 'const x = 1;';
+    const { unmount } = render(<CodeBlockView {...makeProps({ node: { textContent: shortContent } as NodeViewProps['node'] })} />);
+    expect(screen.getByRole('button')).toHaveAttribute('aria-label', `Copy code: ${shortContent}`);
+    unmount();
+
+    // Long content — label is truncated at LABEL_PREVIEW_LENGTH characters.
+    const longContent = 'a'.repeat(LABEL_PREVIEW_LENGTH + 20);
+    render(<CodeBlockView {...makeProps({ node: { textContent: longContent } as NodeViewProps['node'] })} />);
+    expect(screen.getByRole('button')).toHaveAttribute(
+      'aria-label',
+      `Copy code: ${'a'.repeat(LABEL_PREVIEW_LENGTH)}`
+    );
   });
 
   it('aria-label matches visible button text in "copied" state', async () => {
