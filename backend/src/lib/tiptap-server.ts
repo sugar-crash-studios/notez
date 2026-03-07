@@ -18,11 +18,11 @@ import * as Y from 'yjs';
 // is used on the frontend — the server needs to mirror that schema.
 const extensions = [
   StarterKit.configure({
-    // Note: history is left enabled server-side since this is for one-time conversion.
-    // codeBlock disabled here so we register the extension explicitly below,
-    // keeping frontend and backend schemas in sync.
+    // history is left enabled server-side (one-time conversion, no undo needed).
+    // codeBlock disabled so we register the extension explicitly below,
+    // keeping the server schema in sync with the frontend.
     codeBlock: false,
-  } as any),
+  }),
   CodeBlock,
   TaskList,
   TaskItem.configure({
@@ -40,7 +40,8 @@ marked.use({
   breaks: true,
 });
 
-// Configure turndown (same as frontend)
+// Configure turndown (mirrors frontend TiptapEditor.tsx — omits React-specific
+// rules such as codeBlockWrapper which only apply to browser-rendered DOM)
 const turndownService = new TurndownService({
   headingStyle: 'atx',
   codeBlockStyle: 'fenced',

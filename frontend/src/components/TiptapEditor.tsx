@@ -103,17 +103,6 @@ turndownService.addRule('images', {
   },
 });
 
-// Defensive rule for the code-block-wrapper div injected by CodeBlockExtension's
-// React node view. TipTap's ReactNodeViewRenderer wraps the pre/code in a div,
-// so Turndown may see that div in a live-DOM snapshot. This rule tells Turndown
-// to recurse into it rather than emit an empty string for the wrapper element.
-turndownService.addRule('codeBlockWrapper', {
-  filter: (node) => {
-    return node.nodeName === 'DIV' && node.classList.contains('code-block-wrapper');
-  },
-  replacement: (content) => content,
-});
-
 // Configure marked to handle task lists and wiki-links
 marked.use({
   gfm: true,

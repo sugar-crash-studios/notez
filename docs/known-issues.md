@@ -380,10 +380,14 @@ constructor signature, additional options (`lowlight`, `defaultLanguage`), and r
 extra ProseMirror decoration plugin. The two base classes are **not** drop-in replacements —
 a clean refactor is required rather than incremental modification.
 **Action required when implementing syntax highlighting:**
-1. `npm install @tiptap/extension-code-block-lowlight lowlight` in frontend
-2. Change `import CodeBlock from '@tiptap/extension-code-block'` → `import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight'`
-3. Replace `CodeBlock.extend(...)` with `CodeBlockLowlight.extend(...)` and pass lowlight instance via options
-4. Update `tiptap-server.ts` to use the lowlight variant for consistent HTML generation
+1. **Frontend:** `npm install @tiptap/extension-code-block-lowlight lowlight`
+2. **Frontend:** Change `import CodeBlock from '@tiptap/extension-code-block'` → `import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight'`
+3. **Frontend:** Replace `CodeBlock.extend(...)` with `CodeBlockLowlight.extend(...)` and pass a configured lowlight instance via options (e.g., `lowlight.registerLanguage(...)`)
+4. **Backend:** `npm install @tiptap/extension-code-block-lowlight lowlight` in `backend/`
+5. **Backend:** Swap the `CodeBlock` import in `tiptap-server.ts` for `CodeBlockLowlight` and pass a lowlight instance configured with the **same language set** as the frontend. Mismatched language sets will produce different HTML between client rendering and server `generateHTML()`, corrupting search snippets, AI note context, and markdown exports.
+6. **Both:** Remove `@tiptap/extension-code-block` from deps once both sides are migrated — keeping the old package installed alongside lowlight risks version drift.
+
+**Note:** `CodeBlockLowlight` and `CodeBlock` are **not** drop-in replacements. The lowlight variant registers an extra ProseMirror decoration plugin and has different constructor options. Incremental/partial migration is not safe — migrate both sides together in one PR.
 **Status:** Deferred — tracked for syntax highlighting milestone
 
 ---

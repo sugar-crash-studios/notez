@@ -37,7 +37,7 @@
     "@hocuspocus/server": "^3.4.4",
     "@prisma/client": "^5.20.0",
     "@tiptap/core": "^3.20.0",
-    "@tiptap/extension-code-block": "^3.20.0",
+    "@tiptap/extension-code-block": "^3.20.1",
     "@tiptap/extension-link": "^3.20.0",
     "@tiptap/extension-task-item": "^3.20.0",
     "@tiptap/extension-task-list": "^3.20.0",

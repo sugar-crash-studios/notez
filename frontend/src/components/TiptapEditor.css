@@ -428,11 +428,21 @@
   opacity: 1;
 }
 
-/* Touch devices have no hover — keep button always visible (H1) */
+/* Touch devices have no hover — keep button always visible */
 @media (hover: none) {
   .code-block-copy-btn {
     opacity: 1;
+    /* WCAG 2.5.5: minimum 44×44 px touch target */
+    min-height: 2.75rem;
+    min-width: 2.75rem;
   }
+}
+
+/* aria-disabled keeps the button in the AT tree (unlike `disabled`);
+   pointer-events:none prevents mouse activation, matching the JS guard. */
+.code-block-copy-btn[aria-disabled="true"] {
+  cursor: default;
+  pointer-events: none;
 }
 
 .code-block-copy-btn:hover {
