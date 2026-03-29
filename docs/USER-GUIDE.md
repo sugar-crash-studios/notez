@@ -744,17 +744,117 @@ The **Users** tab displays:
 
 ### Settings Tabs
 
-#### 1. AI Configuration
+#### 1. Profile
+
+Manage your username and avatar.
+
+#### 2. AI Configuration
 
 See [AI-Powered Features](#ai-powered-features) section above.
 
-#### 2. Profile Settings
+#### 3. API Tokens
 
-(Coming in future updates)
-- Change password
-- Update email
-- Notification preferences
-- Export/import data
+Create tokens for MCP integrations and external API access. See the API reference for details.
+
+#### 4. Webhooks
+
+Register HTTPS endpoints to receive real-time push notifications when notes, tasks, or folders change. See [Webhooks](#webhooks) below.
+
+#### 5. Admin Panel *(admin only)*
+
+Manage users, service accounts, and system settings.
+
+#### 6. Feedback *(admin only)*
+
+Review and manage user-submitted bug reports and feature requests.
+
+---
+
+## Webhooks
+
+Webhooks let Notez push real-time notifications to any HTTPS endpoint when notes, tasks, or folders change. The primary use case is the PAM Android companion app, but the system is generic — any HTTP consumer can register.
+
+### Setting Up a Webhook
+
+1. Go to **Settings → Webhooks**
+2. Click **Add Webhook**
+3. Fill in the form:
+   - **Endpoint URL** — your HTTPS endpoint (e.g. `https://your-relay.example.com/webhook`). Must be a publicly reachable URL; private IPs are blocked.
+   - **Events** — check "Subscribe to all events (`*`)" or pick individual events from the list
+   - **Signing Secret** — a secret used to sign each delivery. A strong secret is auto-generated; copy it now — it's shown only once. You can also type your own (min 16 characters).
+4. Click **Register Webhook**
+
+### Managing Webhooks
+
+Each registered webhook shows as a card with its URL, status, and subscribed events.
+
+| Button | Action |
+|--------|--------|
+| → (paper plane) | Send a test event to verify your endpoint |
+| ⏸ | Pause deliveries (resume any time) |
+| 🗑 | Delete the webhook and cancel pending deliveries |
+| ⌄ | Expand the delivery log |
+
+### Delivery Log
+
+Click ⌄ on any webhook card to see the last 20 delivery attempts:
+
+- **Status** — Success (green), Failed (red), Pending (blue), Cancelled (grey)
+- **Event type** — which event triggered the delivery
+- **HTTP status** and **response time**
+- **↺ Replay** — re-fire any delivery (creates a new delivery with a fresh ID)
+
+### Verifying Deliveries (for developers)
+
+Every delivery is signed. Your endpoint should verify the signature before processing:
+
+```
+X-Notez-Signature: sha256={hex}
+X-Notez-Timestamp: {unix_epoch_seconds}
+X-Notez-Delivery: {unique_delivery_id}
+X-Notez-Event: task.completed
+```
+
+Signature is computed over `v0:{timestamp}:{raw_body}`. Reject if the timestamp is more than 5 minutes old. Use `X-Notez-Delivery` for idempotency (retries reuse the same ID).
+
+### Retry Behaviour
+
+If your endpoint returns a non-2xx response or times out (10s limit), Notez retries automatically:
+
+| Attempt | Delay |
+|---------|-------|
+| 1 | Immediate |
+| 2 | 30 seconds |
+| 3 | 2 minutes |
+| 4 | 10 minutes |
+| 5 | 1 hour |
+| 6 | 4 hours |
+| 7 | 12 hours (final) |
+
+After 7 failures the delivery is marked **failed**. You can replay it manually from the delivery log.
+
+If a webhook accumulates **50 consecutive failures** across all events, it is automatically **disabled**. Re-enable it from the settings card.
+
+### Secret Rotation
+
+To rotate your signing secret without downtime:
+
+1. `PATCH /api/webhooks/:id` with `{ "secret": "new_secret" }`
+2. Both old and new secrets are valid for **1 hour**
+3. Update your consumer to use the new secret before the hour is up
+
+### Catching Up After Downtime
+
+If your consumer was offline and missed events, use the bulk replay endpoint:
+
+```http
+POST /api/webhooks/:id/replay
+{ "since": "2026-03-07T00:00:00Z", "eventTypes": ["task.completed"] }
+```
+
+This re-fires all matching events as new deliveries.
+
+---
 
 ### Theme Selection
 
