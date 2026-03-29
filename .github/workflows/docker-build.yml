@@ -14,7 +14,7 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 jobs:
   test:
-    runs-on: [self-hosted, Linux]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
@@ -42,7 +42,7 @@ jobs:
 
   build:
     needs: test
-    runs-on: [self-hosted, Linux]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
