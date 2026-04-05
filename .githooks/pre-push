@@ -1,0 +1,91 @@
+#!/bin/sh
+#
+# Pre-push hook to enforce version bumps when pushing to main.
+# Checks TWO things:
+#   1. Version in backend/package.json differs from origin/main
+#   2. All four version files are in sync (frontend matches backend,
+#      CHANGELOG.md and changelog.ts both reference the new version)
+#
+# Installation:
+#   git config core.hooksPath .githooks
+#
+
+# Read push info from stdin (git provides: local_ref local_sha remote_ref remote_sha)
+while read local_ref local_sha remote_ref remote_sha; do
+  # Only check pushes targeting main (direct push or merge commit)
+  case "$remote_ref" in
+    refs/heads/main|refs/heads/master)
+      ;;
+    *)
+      continue
+      ;;
+  esac
+
+  # Get the version from the branch being pushed
+  LOCAL_VERSION=$(git show "$local_sha:backend/package.json" 2>/dev/null | grep '"version"' | head -1 | sed 's/.*"version": *"\([^"]*\)".*/\1/')
+
+  # Get the version currently on origin/main
+  REMOTE_VERSION=$(git show "origin/main:backend/package.json" 2>/dev/null | grep '"version"' | head -1 | sed 's/.*"version": *"\([^"]*\)".*/\1/')
+
+  if [ -z "$LOCAL_VERSION" ]; then
+    echo ""
+    echo "WARNING: Could not read version from backend/package.json"
+    echo ""
+    continue
+  fi
+
+  if [ -z "$REMOTE_VERSION" ]; then
+    # First push or origin/main doesn't exist yet, allow it
+    continue
+  fi
+
+  # CHECK 1: Version must differ from origin/main
+  if [ "$LOCAL_VERSION" = "$REMOTE_VERSION" ]; then
+    echo ""
+    echo "PUSH BLOCKED: Version not bumped!"
+    echo ""
+    echo "  Local version:  $LOCAL_VERSION"
+    echo "  Remote version: $REMOTE_VERSION"
+    echo ""
+    echo "Every push to main requires a version bump."
+    echo "Update ALL of these before pushing:"
+    echo "  - backend/package.json"
+    echo "  - frontend/package.json"
+    echo "  - CHANGELOG.md"
+    echo "  - frontend/src/data/changelog.ts"
+    echo ""
+    exit 1
+  fi
+
+  # CHECK 2: All four version files must be in sync
+  ERRORS=""
+
+  # frontend/package.json version must match backend
+  FE_VERSION=$(git show "$local_sha:frontend/package.json" 2>/dev/null | grep '"version"' | head -1 | sed 's/.*"version": *"\([^"]*\)".*/\1/')
+  if [ "$FE_VERSION" != "$LOCAL_VERSION" ]; then
+    ERRORS="${ERRORS}  - frontend/package.json is ${FE_VERSION:-missing} (expected $LOCAL_VERSION)\n"
+  fi
+
+  # CHANGELOG.md must contain the new version
+  if ! git show "$local_sha:CHANGELOG.md" 2>/dev/null | grep -q "\[$LOCAL_VERSION\]"; then
+    ERRORS="${ERRORS}  - CHANGELOG.md missing entry for [$LOCAL_VERSION]\n"
+  fi
+
+  # changelog.ts must contain the new version
+  if ! git show "$local_sha:frontend/src/data/changelog.ts" 2>/dev/null | grep -q "'$LOCAL_VERSION'"; then
+    ERRORS="${ERRORS}  - frontend/src/data/changelog.ts missing entry for $LOCAL_VERSION\n"
+  fi
+
+  if [ -n "$ERRORS" ]; then
+    echo ""
+    echo "PUSH BLOCKED: Version bumped to $LOCAL_VERSION but files are out of sync!"
+    echo ""
+    printf "  Issues found:\n$ERRORS"
+    echo ""
+    echo "All four version files must be updated together."
+    echo ""
+    exit 1
+  fi
+done
+
+exit 0
