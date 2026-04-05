@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Bot, ArrowLeft, FileText, Tag, Folder, Search, ChevronDown } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Bot, ArrowLeft, FileText, Tag, Folder, Search } from 'lucide-react';
 import { serviceAccountsApi } from '../lib/api';
 import { useToast } from './Toast';
 
@@ -67,8 +67,8 @@ export function ServiceAccountWorkspace({
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
 
-  // Notes state
-  const [notes, setNotes] = useState<NoteItem[]>([]);
+  // Notes state - rawNotes holds server data, filteredNotes is derived
+  const [rawNotes, setRawNotes] = useState<NoteItem[]>([]);
   const [notesTotal, setNotesTotal] = useState(0);
   const [notesOffset, setNotesOffset] = useState(0);
   const [isLoadingNotes, setIsLoadingNotes] = useState(true);
@@ -78,6 +78,13 @@ export function ServiceAccountWorkspace({
   const [isLoadingSidebar, setIsLoadingSidebar] = useState(true);
 
   const NOTES_LIMIT = 50;
+
+  // Derive filtered notes from raw notes (tag + search are client-side)
+  const filteredNotes = rawNotes.filter((n) => {
+    if (selectedTagId && !n.tags.some((t) => t.id === selectedTagId)) return false;
+    if (searchQuery && !n.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    return true;
+  });
 
   // Load folders and tags
   useEffect(() => {
@@ -104,10 +111,10 @@ export function ServiceAccountWorkspace({
     return () => { cancelled = true; };
   }, [accountId]);
 
-  // Load notes when folder/tag/search changes
+  // Load notes when folder changes (tag/search filtering is client-side via filteredNotes)
   useEffect(() => {
     let cancelled = false;
-    const timer = setTimeout(async () => {
+    async function loadNotes() {
       setIsLoadingNotes(true);
       setNotesOffset(0);
       try {
@@ -122,21 +129,7 @@ export function ServiceAccountWorkspace({
         }
         const res = await serviceAccountsApi.getAccountNotes(accountId, params);
         if (!cancelled) {
-          let filtered = res.data.notes;
-          // Client-side tag filter (backend doesn't support tag filter yet)
-          if (selectedTagId) {
-            filtered = filtered.filter((n: NoteItem) =>
-              n.tags.some((t) => t.id === selectedTagId)
-            );
-          }
-          // Client-side search filter
-          if (searchQuery) {
-            const q = searchQuery.toLowerCase();
-            filtered = filtered.filter((n: NoteItem) =>
-              n.title.toLowerCase().includes(q)
-            );
-          }
-          setNotes(filtered);
+          setRawNotes(res.data.notes);
           setNotesTotal(res.data.total);
         }
       } catch {
@@ -144,9 +137,10 @@ export function ServiceAccountWorkspace({
       } finally {
         if (!cancelled) setIsLoadingNotes(false);
       }
-    }, 200);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [accountId, selectedFolderId, selectedTagId, searchQuery]);
+    }
+    loadNotes();
+    return () => { cancelled = true; };
+  }, [accountId, selectedFolderId]);
 
   // Load more notes
   const handleLoadMore = async () => {
@@ -162,7 +156,7 @@ export function ServiceAccountWorkspace({
         params.folderId = selectedFolderId;
       }
       const res = await serviceAccountsApi.getAccountNotes(accountId, params);
-      setNotes((prev) => [...prev, ...res.data.notes]);
+      setRawNotes((prev) => [...prev, ...res.data.notes]);
       setNotesOffset(newOffset);
     } catch {
       showToast('Failed to load more notes', 'error');
@@ -318,7 +312,7 @@ export function ServiceAccountWorkspace({
                         : 'All Notes'}
                 </span>
                 <span className="text-xs text-gray-400">
-                  {notes.length}{notesTotal > notes.length ? ` of ${notesTotal}` : ''} notes
+                  {filteredNotes.length}{rawNotes.length < notesTotal ? ` of ${notesTotal}` : ''} notes
                 </span>
               </div>
               <div className="relative">
@@ -337,13 +331,13 @@ export function ServiceAccountWorkspace({
             <div className="flex-1 overflow-y-auto">
               {isLoadingNotes ? (
                 <div className="p-4 text-sm text-gray-500 dark:text-gray-400 text-center">Loading...</div>
-              ) : notes.length === 0 ? (
+              ) : filteredNotes.length === 0 ? (
                 <div className="p-4 text-sm text-gray-500 dark:text-gray-400 text-center">
-                  {searchQuery ? 'No notes match your search.' : 'No notes found.'}
+                  {searchQuery || selectedTagId ? 'No notes match your filters.' : 'No notes found.'}
                 </div>
               ) : (
                 <>
-                  {notes.map((note) => (
+                  {filteredNotes.map((note) => (
                     <button
                       key={note.id}
                       onClick={() => onSelectNote(note.id)}
@@ -387,8 +381,8 @@ export function ServiceAccountWorkspace({
                     </button>
                   ))}
 
-                  {/* Load More */}
-                  {notes.length < notesTotal && (
+                  {/* Load More - based on raw (unfiltered) count vs server total */}
+                  {rawNotes.length < notesTotal && (
                     <div className="p-3 text-center">
                       <button
                         onClick={handleLoadMore}

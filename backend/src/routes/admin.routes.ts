@@ -139,7 +139,7 @@ export async function adminRoutes(fastify: FastifyInstance) {
   // ─── Per-Account Workspace Endpoints ────────────────────────────────
 
   const accountNotesQuerySchema = paginationQuerySchema.extend({
-    folderId: z.string().optional(),
+    folderId: z.union([z.string().uuid(), z.literal('unfiled')]).optional(),
   });
 
   // Get folders for a specific service account
