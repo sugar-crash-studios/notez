@@ -402,6 +402,42 @@ This follows the existing `ImageUploadExtension.ts` / `ResizableImage.tsx` patte
 
 ---
 
+## Deferred Review Findings (PR #18 -- Service Account Dashboard v1.18.0)
+
+Identified during 4-agent code review (Architect, Dev, Security, UX). All IMMEDIATE findings were fixed before PR. The following MEDIUM/LOW items are deferred:
+
+### 52. Duplicate formatDate/getRelativeTime Utilities
+**Location:** `frontend/src/components/ServiceAccountDashboard.tsx`, `NoteList.tsx`, `KanbanBoard.tsx`
+**Issue:** Nearly identical relative-time formatting functions duplicated across 3+ components.
+**Severity:** LOW
+**Status:** Deferred -- extract to shared `utils/formatDate.ts`
+
+### 53. Dashboard Re-fetches on Back Navigation (No Cache)
+**Location:** `frontend/src/components/ServiceAccountDashboard.tsx`
+**Issue:** Navigating back from a service account's notes re-mounts the dashboard and re-fetches stats. Causes a flash. No stale-while-revalidate pattern.
+**Severity:** LOW
+**Status:** Deferred -- consider React Query / SWR if users report sluggishness
+
+### 54. No Error Boundary Around ServiceAccountDashboard
+**Location:** `frontend/src/pages/EditorPage.tsx`
+**Issue:** If the dashboard component throws, it could blank the entire editor page. Other complex components (collaborative editor) have error boundaries.
+**Severity:** MEDIUM
+**Status:** Deferred -- add React error boundary wrapper
+
+### 55. Amber Warning Dark Mode Contrast
+**Location:** `frontend/src/components/ServiceAccountDashboard.tsx`
+**Issue:** `dark:text-amber-400` on `dark:bg-gray-800` yields approximately 3.8:1 contrast ratio, below WCAG AA for small text. Should use `dark:text-amber-300`.
+**Severity:** LOW
+**Status:** Deferred -- minor a11y polish
+
+### 56. N+1 Query Pattern in getServiceAccountStats
+**Location:** `backend/src/services/user.service.ts`
+**Issue:** 5 queries per service account inside Promise.all(accounts.map()). Acceptable for small counts (capped at 50), but should be consolidated to raw SQL aggregates if account count grows. Documented with TODO comment.
+**Severity:** LOW
+**Status:** Deferred -- optimize if service account count exceeds ~20
+
+---
+
 ## Version Notes
 
 | Issue | Identified | Fixed | Version |
@@ -475,3 +511,8 @@ This follows the existing `ImageUploadExtension.ts` / `ResizableImage.tsx` patte
 | Token scope deduplication | 2026-02-27 | 2026-02-27 | v1.6.0 |
 | htmlToPlainText missing entity decoding | 2026-02-27 | 2026-02-27 | v1.6.0 |
 | CodeBlockExtension → CodeBlockLowlight refactor needed for syntax highlighting | 2026-03-07 | Deferred | - |
+| Duplicate formatDate/getRelativeTime utilities | 2026-04-05 | Deferred | - |
+| Dashboard re-fetches on back navigation | 2026-04-05 | Deferred | - |
+| No error boundary around ServiceAccountDashboard | 2026-04-05 | Deferred | - |
+| Amber warning dark mode contrast | 2026-04-05 | Deferred | - |
+| N+1 query in getServiceAccountStats | 2026-04-05 | Deferred | - |
