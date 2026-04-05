@@ -11,6 +11,7 @@ import {
   getServiceAccountFolders,
   getServiceAccountNotes,
   getServiceAccountTags,
+  getServiceAccountActivity,
 } from '../services/user.service.js';
 import { listApiTokens, createApiToken, revokeApiToken } from '../services/token.service.js';
 import { AppError } from '../utils/errors.js';
@@ -226,6 +227,42 @@ export async function adminRoutes(fastify: FastifyInstance) {
         return reply.status(500).send({
           error: 'Internal Server Error',
           message: 'Failed to get service account tags',
+        });
+      }
+    }
+  );
+
+  // Get activity timeline for a specific service account
+  const activityQuerySchema = z.object({
+    limit: z.coerce.number().int().min(1).max(100).default(50),
+    before: z.string().datetime().optional(),
+  });
+
+  fastify.get(
+    '/admin/service-accounts/:id/activity',
+    {
+      preHandler: [
+        validateParams(uuidParamSchema),
+        validateQuery(activityQuerySchema),
+      ],
+    },
+    async (request, reply) => {
+      try {
+        const { id } = request.params as { id: string };
+        const { limit, before } = request.query as { limit: number; before?: string };
+        const result = await getServiceAccountActivity(id, { limit, before });
+        return result;
+      } catch (error) {
+        if (error instanceof AppError) {
+          return reply.status(error.statusCode).send({
+            error: error.name,
+            message: error.message,
+          });
+        }
+        fastify.log.error(error);
+        return reply.status(500).send({
+          error: 'Internal Server Error',
+          message: 'Failed to get service account activity',
         });
       }
     }

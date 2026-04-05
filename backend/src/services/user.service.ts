@@ -498,6 +498,133 @@ export async function getServiceAccountTags(userId: string) {
  * Get per-account stats for all service accounts (dashboard)
  * Returns counts, last activity, recent notes, and token health per account.
  */
+/**
+ * Get activity timeline for a specific service account.
+ * Merges notes, tasks, and folders into a reverse-chronological stream.
+ * Action derived from timestamps: created (createdAt ~= updatedAt within 1s) vs updated.
+ */
+export async function getServiceAccountActivity(
+  userId: string,
+  options?: { limit?: number; before?: string }
+) {
+  await verifyServiceAccountUser(userId);
+
+  const limit = Math.min(options?.limit ?? 50, 100);
+  const beforeDate = options?.before ? new Date(options.before) : undefined;
+
+  // Build date filter for cursor pagination
+  const dateFilter = beforeDate ? { lt: beforeDate } : undefined;
+
+  // Fetch notes, tasks, and folders in parallel
+  const [notes, tasks, folders] = await Promise.all([
+    prisma.note.findMany({
+      where: {
+        userId,
+        deleted: false,
+        ...(dateFilter && { updatedAt: dateFilter }),
+      },
+      select: {
+        id: true,
+        title: true,
+        createdAt: true,
+        updatedAt: true,
+        folderId: true,
+        folder: { select: { id: true, name: true } },
+        tags: { select: { tag: { select: { id: true, name: true } } } },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: limit + 1, // fetch one extra to check hasMore
+    }),
+    prisma.task.findMany({
+      where: {
+        userId,
+        ...(dateFilter && { updatedAt: dateFilter }),
+      },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        folderId: true,
+        folder: { select: { id: true, name: true } },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: limit + 1,
+    }),
+    prisma.folder.findMany({
+      where: {
+        userId,
+        ...(dateFilter && { updatedAt: dateFilter }),
+      },
+      select: {
+        id: true,
+        name: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: limit + 1,
+    }),
+  ]);
+
+  // Derive action: created if createdAt ~= updatedAt (within 1 second)
+  function deriveAction(createdAt: Date, updatedAt: Date): 'created' | 'updated' {
+    return Math.abs(createdAt.getTime() - updatedAt.getTime()) < 1000 ? 'created' : 'updated';
+  }
+
+  // Merge into unified timeline
+  type ActivityItem = {
+    type: 'note' | 'task' | 'folder';
+    action: 'created' | 'updated';
+    id: string;
+    title: string;
+    folder: { id: string; name: string } | null;
+    timestamp: string;
+    tags?: Array<{ id: string; name: string }>;
+    status?: string;
+  };
+
+  const items: ActivityItem[] = [
+    ...notes.map((n) => ({
+      type: 'note' as const,
+      action: deriveAction(n.createdAt, n.updatedAt),
+      id: n.id,
+      title: n.title,
+      folder: n.folder,
+      timestamp: n.updatedAt.toISOString(),
+      tags: n.tags.map((nt) => nt.tag),
+    })),
+    ...tasks.map((t) => ({
+      type: 'task' as const,
+      action: deriveAction(t.createdAt, t.updatedAt),
+      id: t.id,
+      title: t.title,
+      folder: t.folder,
+      timestamp: t.updatedAt.toISOString(),
+      status: t.status,
+    })),
+    ...folders.map((f) => ({
+      type: 'folder' as const,
+      action: deriveAction(f.createdAt, f.updatedAt),
+      id: f.id,
+      title: f.name,
+      folder: null,
+      timestamp: f.updatedAt.toISOString(),
+    })),
+  ];
+
+  // Sort by timestamp descending
+  items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+  // Apply limit and determine hasMore
+  const trimmed = items.slice(0, limit);
+  const hasMore = items.length > limit;
+  const nextCursor = trimmed.length > 0 ? trimmed[trimmed.length - 1].timestamp : null;
+
+  return { items: trimmed, hasMore, nextCursor };
+}
+
 export async function getServiceAccountStats() {
   // TODO: If account count grows beyond ~20, consolidate per-account queries
   // into raw SQL aggregates to avoid the N+1 pattern below (5 queries per account).

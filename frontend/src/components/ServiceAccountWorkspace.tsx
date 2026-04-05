@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bot, ArrowLeft, FileText, Tag, Folder, Search } from 'lucide-react';
+import { Bot, ArrowLeft, FileText, Tag, Folder, Search, CheckSquare, FolderPlus, ChevronRight } from 'lucide-react';
 import { serviceAccountsApi } from '../lib/api';
 import { useToast } from './Toast';
 
@@ -24,6 +24,76 @@ interface NoteItem {
   folderId: string | null;
   folder: { id: string; name: string } | null;
   tags: Array<{ id: string; name: string }>;
+}
+
+interface ActivityItem {
+  type: 'note' | 'task' | 'folder';
+  action: 'created' | 'updated';
+  id: string;
+  title: string;
+  folder: { id: string; name: string } | null;
+  timestamp: string;
+  tags?: Array<{ id: string; name: string }>;
+  status?: string;
+}
+
+type GroupedActivity = {
+  kind: 'single';
+  item: ActivityItem;
+} | {
+  kind: 'group';
+  action: string;
+  type: string;
+  folder: { id: string; name: string } | null;
+  items: ActivityItem[];
+  timestamp: string;
+};
+
+type ActivityFilter = {
+  actionType: 'all' | 'created' | 'updated';
+  contentType: 'all' | 'note' | 'task' | 'folder';
+};
+
+/** Group consecutive same-type/action/folder items within 5 minutes */
+export function groupActivityItems(items: ActivityItem[]): GroupedActivity[] {
+  const groups: GroupedActivity[] = [];
+  let i = 0;
+
+  while (i < items.length) {
+    const current = items[i];
+    const batch: ActivityItem[] = [current];
+
+    // Collect consecutive items with same action + type + folderId within 5 minutes
+    while (i + 1 < items.length) {
+      const next = items[i + 1];
+      const timeDiff = Math.abs(new Date(current.timestamp).getTime() - new Date(next.timestamp).getTime());
+      const sameGroup =
+        next.action === current.action &&
+        next.type === current.type &&
+        (next.folder?.id ?? null) === (current.folder?.id ?? null) &&
+        timeDiff <= 5 * 60 * 1000;
+
+      if (!sameGroup) break;
+      batch.push(next);
+      i++;
+    }
+
+    if (batch.length === 1) {
+      groups.push({ kind: 'single', item: batch[0] });
+    } else {
+      groups.push({
+        kind: 'group',
+        action: current.action,
+        type: current.type,
+        folder: current.folder,
+        items: batch,
+        timestamp: batch[0].timestamp,
+      });
+    }
+    i++;
+  }
+
+  return groups;
 }
 
 interface ServiceAccountWorkspaceProps {
@@ -410,13 +480,263 @@ export function ServiceAccountWorkspace({
           </div>
         </div>
       ) : (
-        /* Activity Tab Placeholder */
-        <div className="flex-1 flex items-center justify-center text-gray-400 dark:text-gray-500">
-          <div className="text-center">
-            <p className="text-sm">Activity timeline coming soon</p>
-          </div>
-        </div>
+        /* Activity Tab */
+        <ActivityTimeline
+          accountId={accountId}
+          onSelectNote={onSelectNote}
+        />
       )}
+    </div>
+  );
+}
+
+// ─── Activity Timeline ─────────────────────────────────────────────────
+
+function getDateLabel(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today.getTime() - 86400000);
+  const itemDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  if (itemDate.getTime() === today.getTime()) return 'Today';
+  if (itemDate.getTime() === yesterday.getTime()) return 'Yesterday';
+  return date.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+}
+
+function getTimeStr(dateStr: string): string {
+  return new Date(dateStr).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+
+const typeIcons = {
+  note: FileText,
+  task: CheckSquare,
+  folder: FolderPlus,
+};
+
+function ActivityTimeline({ accountId, onSelectNote }: { accountId: string; onSelectNote: (id: string) => void }) {
+  const { showToast } = useToast();
+  const [items, setItems] = useState<ActivityItem[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [filter, setFilter] = useState<ActivityFilter>({ actionType: 'all', contentType: 'all' });
+  const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setIsLoading(true);
+      try {
+        const res = await serviceAccountsApi.getAccountActivity(accountId, { limit: 50 });
+        if (!cancelled) {
+          setItems(res.data.items);
+          setHasMore(res.data.hasMore);
+          setNextCursor(res.data.nextCursor);
+        }
+      } catch {
+        if (!cancelled) showToast('Failed to load activity', 'error');
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [accountId]);
+
+  const handleLoadMore = async () => {
+    if (!nextCursor) return;
+    try {
+      const res = await serviceAccountsApi.getAccountActivity(accountId, { limit: 50, before: nextCursor });
+      setItems((prev) => [...prev, ...res.data.items]);
+      setHasMore(res.data.hasMore);
+      setNextCursor(res.data.nextCursor);
+    } catch {
+      showToast('Failed to load more activity', 'error');
+    }
+  };
+
+  // Apply filters
+  const filtered = items.filter((item) => {
+    if (filter.actionType !== 'all' && item.action !== filter.actionType) return false;
+    if (filter.contentType !== 'all' && item.type !== filter.contentType) return false;
+    return true;
+  });
+
+  // Group
+  const grouped = groupActivityItems(filtered);
+
+  // Group by date
+  const dateGroups: Array<{ label: string; items: GroupedActivity[] }> = [];
+  for (const g of grouped) {
+    const ts = g.kind === 'single' ? g.item.timestamp : g.timestamp;
+    const label = getDateLabel(ts);
+    const existing = dateGroups.find((dg) => dg.label === label);
+    if (existing) {
+      existing.items.push(g);
+    } else {
+      dateGroups.push({ label, items: [g] });
+    }
+  }
+
+  const toggleGroup = (idx: number) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx); else next.add(idx);
+      return next;
+    });
+  };
+
+  if (isLoading) {
+    return <div className="p-4 text-sm text-gray-500 dark:text-gray-400 text-center">Loading activity...</div>;
+  }
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0">
+      {/* Filters */}
+      <div className="flex items-center gap-2 p-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <select
+          value={filter.actionType}
+          onChange={(e) => setFilter((f) => ({ ...f, actionType: e.target.value as ActivityFilter['actionType'] }))}
+          className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+          aria-label="Filter by action"
+        >
+          <option value="all">All actions</option>
+          <option value="created">Created</option>
+          <option value="updated">Updated</option>
+        </select>
+        <select
+          value={filter.contentType}
+          onChange={(e) => setFilter((f) => ({ ...f, contentType: e.target.value as ActivityFilter['contentType'] }))}
+          className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+          aria-label="Filter by content type"
+        >
+          <option value="all">All types</option>
+          <option value="note">Notes</option>
+          <option value="task">Tasks</option>
+          <option value="folder">Folders</option>
+        </select>
+        <span className="text-xs text-gray-400 ml-auto">
+          {filtered.length} items
+        </span>
+      </div>
+
+      {/* Timeline */}
+      <div className="flex-1 overflow-y-auto">
+        {filtered.length === 0 ? (
+          <div className="p-4 text-sm text-gray-500 dark:text-gray-400 text-center">
+            {items.length === 0 ? 'No activity yet.' : 'No activity matches your filters.'}
+          </div>
+        ) : (
+          <>
+            {dateGroups.map((dg) => (
+              <div key={dg.label}>
+                <div className="sticky top-0 px-4 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-700">
+                  {dg.label}
+                </div>
+                {dg.items.map((g, idx) => {
+                  const globalIdx = grouped.indexOf(g);
+                  if (g.kind === 'single') {
+                    const item = g.item;
+                    const Icon = typeIcons[item.type];
+                    return (
+                      <button
+                        key={`${item.type}-${item.id}-${idx}`}
+                        onClick={() => item.type === 'note' && onSelectNote(item.id)}
+                        className={`w-full px-4 py-2.5 flex items-start gap-3 text-left border-b border-gray-100 dark:border-gray-700 ${
+                          item.type === 'note' ? 'hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer' : 'cursor-default'
+                        }`}
+                      >
+                        <span className="text-xs text-gray-400 dark:text-gray-500 w-12 flex-shrink-0 pt-0.5">
+                          {getTimeStr(item.timestamp)}
+                        </span>
+                        <Icon className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-gray-400" aria-hidden="true" />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm text-gray-900 dark:text-white">
+                            <span className={`font-medium ${item.action === 'created' ? 'text-green-600 dark:text-green-400' : 'text-blue-600 dark:text-blue-400'}`}>
+                              {item.action === 'created' ? 'Created' : 'Updated'}
+                            </span>
+                            {' '}{item.title}
+                          </span>
+                          {item.folder && (
+                            <span className="text-xs text-gray-400 dark:text-gray-500 ml-2">
+                              in {item.folder.name}
+                            </span>
+                          )}
+                          {item.tags && item.tags.length > 0 && (
+                            <div className="flex gap-1 mt-0.5">
+                              {item.tags.slice(0, 3).map((t) => (
+                                <span key={t.id} className="text-xs px-1 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded">
+                                  {t.name}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {item.status && (
+                            <span className="text-xs text-gray-400 dark:text-gray-500 ml-2">({item.status})</span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  } else {
+                    // Group
+                    const isExpanded = expandedGroups.has(globalIdx);
+                    const Icon = typeIcons[g.type as keyof typeof typeIcons] ?? FileText;
+                    return (
+                      <div key={`group-${globalIdx}`} className="border-b border-gray-100 dark:border-gray-700">
+                        <button
+                          onClick={() => toggleGroup(globalIdx)}
+                          className="w-full px-4 py-2.5 flex items-start gap-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                          aria-expanded={isExpanded}
+                        >
+                          <span className="text-xs text-gray-400 dark:text-gray-500 w-12 flex-shrink-0 pt-0.5">
+                            {getTimeStr(g.timestamp)}
+                          </span>
+                          <Icon className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-gray-400" aria-hidden="true" />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm text-gray-900 dark:text-white">
+                              <span className={`font-medium ${g.action === 'created' ? 'text-green-600 dark:text-green-400' : 'text-blue-600 dark:text-blue-400'}`}>
+                                {g.action === 'created' ? 'Created' : 'Updated'}
+                              </span>
+                              {' '}{g.items.length} {g.type}s
+                              {g.folder && <span className="text-gray-400"> in {g.folder.name}</span>}
+                            </span>
+                          </div>
+                          <ChevronRight className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                        </button>
+                        {isExpanded && (
+                          <div className="pl-12 bg-gray-50 dark:bg-gray-900/30">
+                            {g.items.map((item) => (
+                              <button
+                                key={`${item.type}-${item.id}`}
+                                onClick={() => item.type === 'note' && onSelectNote(item.id)}
+                                className={`w-full px-4 py-1.5 flex items-center gap-2 text-left text-sm ${
+                                  item.type === 'note' ? 'hover:bg-gray-100 dark:hover:bg-gray-700/50 cursor-pointer' : 'cursor-default'
+                                }`}
+                              >
+                                <span className="text-xs text-gray-400 w-12 flex-shrink-0">{getTimeStr(item.timestamp)}</span>
+                                <span className="text-gray-700 dark:text-gray-300 truncate">{item.title}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                })}
+              </div>
+            ))}
+
+            {hasMore && (
+              <div className="p-3 text-center">
+                <button onClick={handleLoadMore} className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
+                  Load more...
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
