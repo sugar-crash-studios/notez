@@ -255,10 +255,11 @@ export async function listServiceAccountNotes(options?: { limit?: number; offset
   const limit = options?.limit ?? 50;
   const offset = options?.offset ?? 0;
 
-  const where: any = { user: { isServiceAccount: true }, deleted: false };
-  if (options?.userId) {
-    where.userId = options.userId;
-  }
+  const where = {
+    user: { isServiceAccount: true },
+    deleted: false as const,
+    ...(options?.userId && { userId: options.userId }),
+  };
 
   const [notes, total] = await Promise.all([
     prisma.note.findMany({
@@ -369,7 +370,6 @@ export async function getServiceAccountStats() {
     select: {
       id: true,
       username: true,
-      createdAt: true,
       _count: {
         select: {
           notes: { where: { deleted: false } },

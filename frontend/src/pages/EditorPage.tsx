@@ -180,12 +180,14 @@ export function EditorPage() {
             onSelectTag={(tagId) => {
               setSelectedTagId(tagId);
               setSelectedNoteId(null);
+              setSelectedServiceAccount(null); // Clear service account drill-down
               setSelectedView('notes'); // Switch to notes view when tag is selected
               setMobileView('list'); // Switch to list view on mobile after selecting tag
             }}
             onSelectView={(view) => {
               setSelectedView(view);
               setSelectedNoteId(null);
+              setSelectedServiceAccount(null); // Clear service account drill-down
               setMobileView('list'); // Switch to list view on mobile after selecting view
             }}
             collapsed={sidebarCollapsed}

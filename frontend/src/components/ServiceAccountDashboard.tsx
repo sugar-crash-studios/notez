@@ -44,6 +44,8 @@ function getHealthWarnings(stat: ServiceAccountStat): HealthWarning[] {
   if (stat.earliestTokenExpiry) {
     const expiry = new Date(stat.earliestTokenExpiry);
     const daysUntilExpiry = Math.floor((expiry.getTime() - now.getTime()) / 86400000);
+    // Backend filters expired tokens, so daysUntilExpiry < 0 is rare (clock skew, stale data).
+    // Kept as defensive guard since "no active tokens" (tokenCount=0) covers the common case.
     if (daysUntilExpiry < 0) {
       warnings.push({
         type: 'token-expiring',
@@ -148,7 +150,7 @@ export function ServiceAccountDashboard({ onSelectAccount }: ServiceAccountDashb
               key={stat.id}
               onClick={() => onSelectAccount(stat.id, stat.username)}
               aria-label={`View service account ${stat.username}`}
-              className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-left hover:border-blue-300 dark:hover:border-blue-600 hover:bg-gray-50 dark:hover:bg-gray-750 hover:shadow-sm focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none transition-all"
+              className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-left hover:border-blue-300 dark:hover:border-blue-600 hover:bg-gray-50 dark:hover:bg-gray-700/50 hover:shadow-sm focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none transition-all"
             >
               {/* Header */}
               <div className="flex items-center gap-2 mb-3">
