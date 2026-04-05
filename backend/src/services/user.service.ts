@@ -251,11 +251,14 @@ export async function listServiceAccounts() {
 /**
  * List all notes from service account users (admin read-only)
  */
-export async function listServiceAccountNotes(options?: { limit?: number; offset?: number }) {
+export async function listServiceAccountNotes(options?: { limit?: number; offset?: number; userId?: string }) {
   const limit = options?.limit ?? 50;
   const offset = options?.offset ?? 0;
 
-  const where = { user: { isServiceAccount: true }, deleted: false };
+  const where: any = { user: { isServiceAccount: true }, deleted: false };
+  if (options?.userId) {
+    where.userId = options.userId;
+  }
 
   const [notes, total] = await Promise.all([
     prisma.note.findMany({
@@ -352,6 +355,118 @@ export async function listServiceAccountTasks(options?: { limit?: number; offset
   ]);
 
   return { tasks, total };
+}
+
+/**
+ * Get per-account stats for all service accounts (dashboard)
+ * Returns counts, last activity, recent notes, and token health per account.
+ */
+export async function getServiceAccountStats() {
+  // TODO: If account count grows beyond ~20, consolidate per-account queries
+  // into raw SQL aggregates to avoid the N+1 pattern below (5 queries per account).
+  const accounts = await prisma.user.findMany({
+    where: { isServiceAccount: true },
+    select: {
+      id: true,
+      username: true,
+      createdAt: true,
+      _count: {
+        select: {
+          notes: { where: { deleted: false } },
+          folders: true,
+          tags: true,
+          tasks: true,
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 50,
+  });
+
+  const stats = await Promise.all(
+    accounts.map(async (account) => {
+      // Get most recent updatedAt across notes, tasks, and folders
+      const [latestNote, latestTask, latestFolder] = await Promise.all([
+        prisma.note.findFirst({
+          where: { userId: account.id, deleted: false },
+          select: { updatedAt: true },
+          orderBy: { updatedAt: 'desc' },
+        }),
+        prisma.task.findFirst({
+          where: { userId: account.id },
+          select: { updatedAt: true },
+          orderBy: { updatedAt: 'desc' },
+        }),
+        prisma.folder.findFirst({
+          where: { userId: account.id },
+          select: { updatedAt: true },
+          orderBy: { updatedAt: 'desc' },
+        }),
+      ]);
+
+      const timestamps = [
+        latestNote?.updatedAt,
+        latestTask?.updatedAt,
+        latestFolder?.updatedAt,
+      ].filter(Boolean) as Date[];
+      const lastActivity = timestamps.length > 0
+        ? new Date(Math.max(...timestamps.map((t) => t.getTime())))
+        : null;
+
+      // Get 3 most recent notes for preview
+      const recentNotes = await prisma.note.findMany({
+        where: { userId: account.id, deleted: false },
+        select: { id: true, title: true, updatedAt: true },
+        orderBy: { updatedAt: 'desc' },
+        take: 3,
+      });
+
+      // Token health: active tokens, earliest expiry, last used
+      const now = new Date();
+      const activeTokens = await prisma.apiToken.findMany({
+        where: {
+          userId: account.id,
+          revokedAt: null,
+          OR: [
+            { expiresAt: null },
+            { expiresAt: { gt: now } },
+          ],
+        },
+        select: { expiresAt: true, lastUsedAt: true },
+      });
+
+      const tokenCount = activeTokens.length;
+      const expiringTokens = activeTokens
+        .filter((t) => t.expiresAt !== null)
+        .map((t) => t.expiresAt!.getTime());
+      const earliestTokenExpiry = expiringTokens.length > 0
+        ? new Date(Math.min(...expiringTokens))
+        : null;
+
+      const tokenLastUsed = activeTokens
+        .filter((t) => t.lastUsedAt !== null)
+        .map((t) => t.lastUsedAt!.getTime());
+      const lastTokenUsedAt = tokenLastUsed.length > 0
+        ? new Date(Math.max(...tokenLastUsed))
+        : null;
+
+      return {
+        id: account.id,
+        username: account.username,
+        noteCount: account._count.notes,
+        folderCount: account._count.folders,
+        tagCount: account._count.tags,
+        taskCount: account._count.tasks,
+        lastActivity: lastActivity?.toISOString() ?? null,
+        recentNotes,
+        tokenCount,
+        earliestTokenExpiry: earliestTokenExpiry?.toISOString() ?? null,
+        lastTokenUsedAt: lastTokenUsedAt?.toISOString() ?? null,
+      };
+    })
+  );
+
+  return stats;
 }
 
 /**

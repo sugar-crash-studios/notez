@@ -1,6 +1,6 @@
 import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { notesApi, sharesApi, serviceAccountsApi } from '../lib/api';
-import { FileText, Files, Plus, Search, Bot } from 'lucide-react';
+import { FileText, Files, Plus, Search, Bot, ArrowLeft } from 'lucide-react';
 import { useToast } from './Toast';
 
 interface Note {
@@ -26,6 +26,8 @@ interface NoteListProps {
   selectedNoteId: string | null;
   onSelectNote: (noteId: string) => void;
   onNoteCreated?: () => void;
+  serviceAccountId?: string;
+  onBackToDashboard?: () => void;
 }
 
 export interface NoteListHandle {
@@ -34,7 +36,7 @@ export interface NoteListHandle {
   updateNote: (noteId: string, updates: { title?: string; folderId?: string | null }) => void;
 }
 
-export const NoteList = forwardRef<NoteListHandle, NoteListProps>(({ folderId, tagId, selectedNoteId, onSelectNote, onNoteCreated }, ref) => {
+export const NoteList = forwardRef<NoteListHandle, NoteListProps>(({ folderId, tagId, selectedNoteId, onSelectNote, onNoteCreated, serviceAccountId, onBackToDashboard }, ref) => {
   const { showToast } = useToast();
   const [notes, setNotes] = useState<Note[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,7 +47,7 @@ export const NoteList = forwardRef<NoteListHandle, NoteListProps>(({ folderId, t
       loadNotes();
     }, 300);
     return () => clearTimeout(timer);
-  }, [folderId, tagId, searchQuery]);
+  }, [folderId, tagId, searchQuery, serviceAccountId]);
 
   // Clear search query when folder changes
   useEffect(() => {
@@ -83,13 +85,17 @@ export const NoteList = forwardRef<NoteListHandle, NoteListProps>(({ folderId, t
         const response = await sharesApi.sharedByMe();
         setNotes(response.data.notes);
       } else if (folderId === 'service-accounts') {
-        // Load notes from service accounts (admin only)
-        const response = await serviceAccountsApi.listNotes({ limit: 100 });
+        // Load notes from service accounts (admin only), filter server-side by userId if selected
+        const params: { limit: number; userId?: string } = { limit: 100 };
+        if (serviceAccountId) {
+          params.userId = serviceAccountId;
+        }
+        const response = await serviceAccountsApi.listNotes(params);
         // Map to Note interface with shareInfo for owner label display
         const mapped = response.data.notes.map((n: any) => ({
           ...n,
           content: null,
-          tags: [],
+          tags: n.tags ?? [],
           shareInfo: {
             shareId: '',
             permission: 'VIEW' as const,
@@ -170,9 +176,21 @@ export const NoteList = forwardRef<NoteListHandle, NoteListProps>(({ folderId, t
       {/* Header */}
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold text-gray-900 dark:text-white">
-            {folderId === 'shared' ? 'Shared with me' : folderId === 'my-shares' ? 'My Shares' : folderId === 'service-accounts' ? 'Service Accounts' : 'Notes'}
-          </h2>
+          <div className="flex items-center gap-2">
+            {onBackToDashboard && (
+              <button
+                onClick={onBackToDashboard}
+                className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
+                title="Back to Service Accounts"
+                aria-label="Back to Service Accounts"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+            )}
+            <h2 className="font-semibold text-gray-900 dark:text-white">
+              {folderId === 'shared' ? 'Shared with me' : folderId === 'my-shares' ? 'My Shares' : folderId === 'service-accounts' ? 'Service Accounts' : 'Notes'}
+            </h2>
+          </div>
           {folderId !== 'shared' && folderId !== 'my-shares' && folderId !== 'service-accounts' && (
             <button
               onClick={handleCreateNote}

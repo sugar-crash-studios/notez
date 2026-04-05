@@ -9,6 +9,7 @@ import TaskForm from '../components/TaskForm';
 import { AppHeader } from '../components/AppHeader';
 import { ResizeHandle } from '../components/ResizeHandle';
 import { Menu, FileText, Edit3, CheckSquare, LayoutList, Columns } from 'lucide-react';
+import { ServiceAccountDashboard } from '../components/ServiceAccountDashboard';
 import type { Task } from '../types';
 
 // localStorage keys
@@ -43,6 +44,7 @@ export function EditorPage() {
     return window.innerWidth >= 1280 ? 'kanban' : 'list';
   });
   const [mobileView, setMobileView] = useState<'sidebar' | 'list' | 'editor'>('list');
+  const [selectedServiceAccount, setSelectedServiceAccount] = useState<{ id: string; username: string } | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [kanbanKey, setKanbanKey] = useState(0); // For refreshing kanban
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -171,6 +173,7 @@ export function EditorPage() {
             onSelectFolder={(folderId) => {
               setSelectedFolderId(folderId);
               setSelectedNoteId(null);
+              setSelectedServiceAccount(null); // Clear service account drill-down
               setSelectedView('notes'); // Switch to notes view when folder is selected
               setMobileView('list'); // Switch to list view on mobile after selecting folder
             }}
@@ -202,18 +205,25 @@ export function EditorPage() {
           />
         )}
 
-        {/* Note List or Task List - Hidden on mobile unless mobileView === 'list' */}
+        {/* Note List, Task List, or Service Account Dashboard */}
         <div
           className={`${mobileView === 'list' ? 'block' : 'hidden'} xl:block flex-shrink-0`}
-          style={{ width: listWidth }}
+          style={selectedFolderId === 'service-accounts' && !selectedServiceAccount ? { width: '100%', flex: 1 } : { width: listWidth }}
         >
-          {selectedView === 'notes' ? (
+          {/* Service Account Dashboard (no account selected yet) */}
+          {selectedFolderId === 'service-accounts' && !selectedServiceAccount ? (
+            <ServiceAccountDashboard
+              onSelectAccount={(id, username) => setSelectedServiceAccount({ id, username })}
+            />
+          ) : selectedView === 'notes' ? (
             <NoteList
               ref={noteListRef}
               folderId={selectedFolderId}
               tagId={selectedTagId}
               selectedNoteId={selectedNoteId}
               onSelectNote={setSelectedNoteId}
+              serviceAccountId={selectedServiceAccount?.id}
+              onBackToDashboard={selectedServiceAccount ? () => setSelectedServiceAccount(null) : undefined}
               onNoteCreated={() => {
                 // Refresh sidebar counts after note creation
                 sidebarRef.current?.refreshFolders();
@@ -256,14 +266,16 @@ export function EditorPage() {
           )}
         </div>
 
-        {/* List Resize Handle */}
-        <ResizeHandle
-          onResize={handleListResize}
-          onResizeEnd={saveListWidth}
-        />
+        {/* List Resize Handle - hidden when dashboard is full-width */}
+        {!(selectedFolderId === 'service-accounts' && !selectedServiceAccount) && (
+          <ResizeHandle
+            onResize={handleListResize}
+            onResizeEnd={saveListWidth}
+          />
+        )}
 
-        {/* Note Editor - Hidden on mobile unless mobileView === 'editor' */}
-        {selectedView === 'notes' && (
+        {/* Note Editor - Hidden on mobile unless mobileView === 'editor', hidden when dashboard is showing */}
+        {selectedView === 'notes' && !(selectedFolderId === 'service-accounts' && !selectedServiceAccount) && (
           <div className={`flex-1 flex-col min-h-0 ${mobileView === 'editor' ? 'flex' : 'hidden'} xl:flex`}>
             <NoteEditor
               noteId={selectedNoteId}

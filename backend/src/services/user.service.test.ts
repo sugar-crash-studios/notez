@@ -16,18 +16,24 @@ vi.mock('../lib/db.js', () => ({
     },
     note: {
       count: vi.fn(),
+      findFirst: vi.fn(),
       findMany: vi.fn(),
       findUnique: vi.fn(),
     },
     folder: {
       count: vi.fn(),
+      findFirst: vi.fn(),
     },
     tag: {
       count: vi.fn(),
     },
     task: {
       findMany: vi.fn(),
+      findFirst: vi.fn(),
       count: vi.fn(),
+    },
+    apiToken: {
+      findMany: vi.fn(),
     },
     $transaction: vi.fn(),
     $queryRaw: vi.fn(),
@@ -71,6 +77,7 @@ import {
   listServiceAccountNotes,
   getServiceAccountNote,
   listServiceAccountTasks,
+  getServiceAccountStats,
 } from './user.service.js';
 import { prisma } from '../lib/db.js';
 
@@ -638,6 +645,124 @@ describe('user.service', () => {
       expect(mockPrisma.task.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { user: { isServiceAccount: true } },
+        })
+      );
+    });
+  });
+
+  // ─── getServiceAccountStats ────────────────────────────────────────────
+  describe('getServiceAccountStats', () => {
+    const mockAccount = {
+      id: 'sa-1',
+      username: 'claude-agent',
+      createdAt: new Date('2025-01-01'),
+      _count: { notes: 5, folders: 2, tags: 3, tasks: 4 },
+    };
+
+    function setupStatsDefaults() {
+      mockPrisma.user.findMany.mockResolvedValue([mockAccount] as any);
+      // Latest timestamps for activity
+      mockPrisma.note.findFirst.mockResolvedValue({ updatedAt: new Date('2026-04-05T14:00:00Z') } as any);
+      mockPrisma.task.findFirst.mockResolvedValue({ updatedAt: new Date('2026-04-04T10:00:00Z') } as any);
+      (mockPrisma.folder as any).findFirst.mockResolvedValue({ updatedAt: new Date('2026-04-03T08:00:00Z') } as any);
+      // Recent notes
+      mockPrisma.note.findMany.mockResolvedValue([
+        { id: 'n1', title: 'Recent Note 1', updatedAt: new Date('2026-04-05T14:00:00Z') },
+        { id: 'n2', title: 'Recent Note 2', updatedAt: new Date('2026-04-04T12:00:00Z') },
+      ] as any);
+      // Token health
+      (mockPrisma.apiToken as any).findMany.mockResolvedValue([
+        { expiresAt: new Date('2026-04-10T00:00:00Z'), lastUsedAt: new Date('2026-04-05T13:00:00Z') },
+      ]);
+    }
+
+    it('should return stats for each service account', async () => {
+      setupStatsDefaults();
+
+      const result = await getServiceAccountStats();
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('sa-1');
+      expect(result[0].username).toBe('claude-agent');
+      expect(result[0].noteCount).toBe(5);
+      expect(result[0].folderCount).toBe(2);
+      expect(result[0].tagCount).toBe(3);
+      expect(result[0].taskCount).toBe(4);
+    });
+
+    it('should compute lastActivity as the most recent timestamp across content types', async () => {
+      setupStatsDefaults();
+
+      const result = await getServiceAccountStats();
+
+      // Note has the latest updatedAt (2026-04-05T14:00:00Z)
+      expect(result[0].lastActivity).toBe(new Date('2026-04-05T14:00:00Z').toISOString());
+    });
+
+    it('should return null lastActivity when account has no content', async () => {
+      mockPrisma.user.findMany.mockResolvedValue([mockAccount] as any);
+      mockPrisma.note.findFirst.mockResolvedValue(null);
+      mockPrisma.task.findFirst.mockResolvedValue(null);
+      (mockPrisma.folder as any).findFirst.mockResolvedValue(null);
+      mockPrisma.note.findMany.mockResolvedValue([]);
+      (mockPrisma.apiToken as any).findMany.mockResolvedValue([]);
+
+      const result = await getServiceAccountStats();
+
+      expect(result[0].lastActivity).toBeNull();
+      expect(result[0].recentNotes).toEqual([]);
+    });
+
+    it('should return recent notes for card preview', async () => {
+      setupStatsDefaults();
+
+      const result = await getServiceAccountStats();
+
+      expect(result[0].recentNotes).toHaveLength(2);
+      expect(result[0].recentNotes[0].title).toBe('Recent Note 1');
+    });
+
+    it('should return token health data', async () => {
+      setupStatsDefaults();
+
+      const result = await getServiceAccountStats();
+
+      expect(result[0].tokenCount).toBe(1);
+      expect(result[0].earliestTokenExpiry).toBe(new Date('2026-04-10T00:00:00Z').toISOString());
+      expect(result[0].lastTokenUsedAt).toBe(new Date('2026-04-05T13:00:00Z').toISOString());
+    });
+
+    it('should return null token dates when no active tokens exist', async () => {
+      mockPrisma.user.findMany.mockResolvedValue([mockAccount] as any);
+      mockPrisma.note.findFirst.mockResolvedValue(null);
+      mockPrisma.task.findFirst.mockResolvedValue(null);
+      (mockPrisma.folder as any).findFirst.mockResolvedValue(null);
+      mockPrisma.note.findMany.mockResolvedValue([]);
+      (mockPrisma.apiToken as any).findMany.mockResolvedValue([]);
+
+      const result = await getServiceAccountStats();
+
+      expect(result[0].tokenCount).toBe(0);
+      expect(result[0].earliestTokenExpiry).toBeNull();
+      expect(result[0].lastTokenUsedAt).toBeNull();
+    });
+
+    it('should return empty array when no service accounts exist', async () => {
+      mockPrisma.user.findMany.mockResolvedValue([]);
+
+      const result = await getServiceAccountStats();
+
+      expect(result).toEqual([]);
+    });
+
+    it('should query only service account users', async () => {
+      mockPrisma.user.findMany.mockResolvedValue([]);
+
+      await getServiceAccountStats();
+
+      expect(mockPrisma.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { isServiceAccount: true },
         })
       );
     });

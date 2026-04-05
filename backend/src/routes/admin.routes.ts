@@ -7,6 +7,7 @@ import {
   listServiceAccountNotes,
   getServiceAccountNote,
   listServiceAccountTasks,
+  getServiceAccountStats,
 } from '../services/user.service.js';
 import { listApiTokens, createApiToken, revokeApiToken } from '../services/token.service.js';
 import { AppError } from '../utils/errors.js';
@@ -16,6 +17,10 @@ import { z } from 'zod';
 const paginationQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0),
+});
+
+const notesPaginationQuerySchema = paginationQuerySchema.extend({
+  userId: z.string().uuid().optional(),
 });
 
 export async function adminRoutes(fastify: FastifyInstance) {
@@ -37,16 +42,30 @@ export async function adminRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // List all notes from service accounts (paginated)
+  // Get per-account stats for dashboard
+  fastify.get('/admin/service-accounts/stats', async (_request, reply) => {
+    try {
+      const stats = await getServiceAccountStats();
+      return { stats };
+    } catch (error) {
+      fastify.log.error(error);
+      return reply.status(500).send({
+        error: 'Internal Server Error',
+        message: 'Failed to get service account stats',
+      });
+    }
+  });
+
+  // List all notes from service accounts (paginated, optionally filtered by userId)
   fastify.get(
     '/admin/service-accounts/notes',
     {
-      preHandler: validateQuery(paginationQuerySchema),
+      preHandler: validateQuery(notesPaginationQuerySchema),
     },
     async (request, reply) => {
       try {
-        const { limit, offset } = request.query as { limit: number; offset: number };
-        const result = await listServiceAccountNotes({ limit, offset });
+        const { limit, offset, userId } = request.query as { limit: number; offset: number; userId?: string };
+        const result = await listServiceAccountNotes({ limit, offset, userId });
         return result;
       } catch (error) {
         fastify.log.error(error);

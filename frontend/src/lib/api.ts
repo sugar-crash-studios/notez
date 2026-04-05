@@ -177,10 +177,26 @@ export const usersApi = {
   stats: () => api.get('/api/users/stats'),
 };
 
+export interface ServiceAccountStat {
+  id: string;
+  username: string;
+  noteCount: number;
+  folderCount: number;
+  tagCount: number;
+  taskCount: number;
+  lastActivity: string | null;
+  recentNotes: Array<{ id: string; title: string; updatedAt: string }>;
+  tokenCount: number;
+  earliestTokenExpiry: string | null;
+  lastTokenUsedAt: string | null;
+}
+
 export const serviceAccountsApi = {
   list: () => api.get('/api/admin/service-accounts'),
 
-  listNotes: (params?: { limit?: number; offset?: number }) =>
+  stats: () => api.get<{ stats: ServiceAccountStat[] }>('/api/admin/service-accounts/stats'),
+
+  listNotes: (params?: { limit?: number; offset?: number; userId?: string }) =>
     api.get('/api/admin/service-accounts/notes', { params }),
 
   getNote: (id: string) => api.get(`/api/admin/service-accounts/notes/${id}`),
