@@ -580,6 +580,35 @@ describe('user.service', () => {
         })
       );
     });
+
+    it('should filter by userId when provided', async () => {
+      mockPrisma.note.findMany.mockResolvedValue([
+        { id: 'note-1', title: 'Agent Note', user: { id: 'sa-1', username: 'claude-agent' } },
+      ] as any);
+      mockPrisma.note.count.mockResolvedValue(1);
+
+      await listServiceAccountNotes({ userId: 'sa-1' });
+
+      expect(mockPrisma.note.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            userId: 'sa-1',
+            user: { isServiceAccount: true },
+            deleted: false,
+          }),
+        })
+      );
+    });
+
+    it('should not include userId in where when not provided', async () => {
+      mockPrisma.note.findMany.mockResolvedValue([]);
+      mockPrisma.note.count.mockResolvedValue(0);
+
+      await listServiceAccountNotes({ limit: 50, offset: 0 });
+
+      const callArgs = mockPrisma.note.findMany.mock.calls[0][0];
+      expect(callArgs.where).not.toHaveProperty('userId');
+    });
   });
 
   // ─── getServiceAccountNote ────────────────────────────────────────────
@@ -753,6 +782,44 @@ describe('user.service', () => {
       const result = await getServiceAccountStats();
 
       expect(result).toEqual([]);
+    });
+
+    it('should pick earliest expiry from multiple tokens', async () => {
+      mockPrisma.user.findMany.mockResolvedValue([mockAccount] as any);
+      mockPrisma.note.findFirst.mockResolvedValue(null);
+      mockPrisma.task.findFirst.mockResolvedValue(null);
+      (mockPrisma.folder as any).findFirst.mockResolvedValue(null);
+      mockPrisma.note.findMany.mockResolvedValue([]);
+      (mockPrisma.apiToken as any).findMany.mockResolvedValue([
+        { expiresAt: new Date('2026-05-01T00:00:00Z'), lastUsedAt: new Date('2026-04-01T00:00:00Z') },
+        { expiresAt: new Date('2026-04-10T00:00:00Z'), lastUsedAt: new Date('2026-04-05T00:00:00Z') },
+        { expiresAt: null, lastUsedAt: null }, // never-expiring token
+      ]);
+
+      const result = await getServiceAccountStats();
+
+      expect(result[0].tokenCount).toBe(3);
+      // Earliest expiry should be Apr 10, ignoring the null (never-expiring) token
+      expect(result[0].earliestTokenExpiry).toBe(new Date('2026-04-10T00:00:00Z').toISOString());
+      // Most recent lastUsedAt should be Apr 5
+      expect(result[0].lastTokenUsedAt).toBe(new Date('2026-04-05T00:00:00Z').toISOString());
+    });
+
+    it('should return null earliestTokenExpiry when all tokens are non-expiring', async () => {
+      mockPrisma.user.findMany.mockResolvedValue([mockAccount] as any);
+      mockPrisma.note.findFirst.mockResolvedValue(null);
+      mockPrisma.task.findFirst.mockResolvedValue(null);
+      (mockPrisma.folder as any).findFirst.mockResolvedValue(null);
+      mockPrisma.note.findMany.mockResolvedValue([]);
+      (mockPrisma.apiToken as any).findMany.mockResolvedValue([
+        { expiresAt: null, lastUsedAt: new Date('2026-04-05T00:00:00Z') },
+      ]);
+
+      const result = await getServiceAccountStats();
+
+      expect(result[0].tokenCount).toBe(1);
+      expect(result[0].earliestTokenExpiry).toBeNull();
+      expect(result[0].lastTokenUsedAt).toBe(new Date('2026-04-05T00:00:00Z').toISOString());
     });
 
     it('should query only service account users', async () => {
