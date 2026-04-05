@@ -359,6 +359,121 @@ export async function listServiceAccountTasks(options?: { limit?: number; offset
 }
 
 /**
+ * Get folders for a specific service account (admin read-only)
+ */
+export async function getServiceAccountFolders(userId: string) {
+  const folders = await prisma.folder.findMany({
+    where: { userId },
+    select: {
+      id: true,
+      name: true,
+      icon: true,
+      createdAt: true,
+      updatedAt: true,
+      _count: {
+        select: { notes: { where: { deleted: false } } },
+      },
+    },
+    orderBy: { name: 'asc' },
+  });
+
+  // Also count unfiled notes (no folder)
+  const unfiledCount = await prisma.note.count({
+    where: { userId, folderId: null, deleted: false },
+  });
+
+  return {
+    folders: folders.map((f) => ({
+      id: f.id,
+      name: f.name,
+      icon: f.icon,
+      createdAt: f.createdAt,
+      updatedAt: f.updatedAt,
+      noteCount: f._count.notes,
+    })),
+    unfiledCount,
+  };
+}
+
+/**
+ * Get notes for a specific service account, filtered by folder (admin read-only)
+ */
+export async function getServiceAccountNotes(
+  userId: string,
+  options?: { folderId?: string | null; limit?: number; offset?: number }
+) {
+  const limit = options?.limit ?? 50;
+  const offset = options?.offset ?? 0;
+
+  const where: {
+    userId: string;
+    deleted: boolean;
+    folderId?: string | null;
+  } = { userId, deleted: false };
+
+  if (options?.folderId === 'unfiled') {
+    where.folderId = null;
+  } else if (options?.folderId) {
+    where.folderId = options.folderId;
+  }
+
+  const [notes, total] = await Promise.all([
+    prisma.note.findMany({
+      where,
+      select: {
+        id: true,
+        title: true,
+        createdAt: true,
+        updatedAt: true,
+        folderId: true,
+        folder: { select: { id: true, name: true } },
+        tags: { select: { tag: { select: { id: true, name: true } } } },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: limit,
+      skip: offset,
+    }),
+    prisma.note.count({ where }),
+  ]);
+
+  return {
+    notes: notes.map((n) => ({
+      ...n,
+      tags: n.tags.map((nt) => nt.tag),
+    })),
+    total,
+  };
+}
+
+/**
+ * Get tags for a specific service account with usage counts (admin read-only)
+ */
+export async function getServiceAccountTags(userId: string) {
+  const tags = await prisma.tag.findMany({
+    where: { userId },
+    select: {
+      id: true,
+      name: true,
+      createdAt: true,
+      _count: {
+        select: {
+          notes: true,
+          taskTags: true,
+        },
+      },
+    },
+    orderBy: { name: 'asc' },
+  });
+
+  return tags.map((t) => ({
+    id: t.id,
+    name: t.name,
+    createdAt: t.createdAt,
+    usageCount: t._count.notes + t._count.taskTags,
+  }));
+}
+
+/**
  * Get per-account stats for all service accounts (dashboard)
  * Returns counts, last activity, recent notes, and token health per account.
  */

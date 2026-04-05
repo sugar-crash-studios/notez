@@ -8,6 +8,9 @@ import {
   getServiceAccountNote,
   listServiceAccountTasks,
   getServiceAccountStats,
+  getServiceAccountFolders,
+  getServiceAccountNotes,
+  getServiceAccountTags,
 } from '../services/user.service.js';
 import { listApiTokens, createApiToken, revokeApiToken } from '../services/token.service.js';
 import { AppError } from '../utils/errors.js';
@@ -128,6 +131,104 @@ export async function adminRoutes(fastify: FastifyInstance) {
         return reply.status(500).send({
           error: 'Internal Server Error',
           message: 'Failed to list service account tasks',
+        });
+      }
+    }
+  );
+
+  // ─── Per-Account Workspace Endpoints ────────────────────────────────
+
+  const accountNotesQuerySchema = paginationQuerySchema.extend({
+    folderId: z.string().optional(),
+  });
+
+  // Get folders for a specific service account
+  fastify.get(
+    '/admin/service-accounts/:id/folders',
+    {
+      preHandler: validateParams(uuidParamSchema),
+    },
+    async (request, reply) => {
+      try {
+        const { id } = request.params as { id: string };
+        await verifyServiceAccount(id);
+        const result = await getServiceAccountFolders(id);
+        return result;
+      } catch (error) {
+        if (error instanceof AppError) {
+          return reply.status(error.statusCode).send({
+            error: error.name,
+            message: error.message,
+          });
+        }
+        fastify.log.error(error);
+        return reply.status(500).send({
+          error: 'Internal Server Error',
+          message: 'Failed to get service account folders',
+        });
+      }
+    }
+  );
+
+  // Get notes for a specific service account (with folder filter + pagination)
+  fastify.get(
+    '/admin/service-accounts/:id/notes',
+    {
+      preHandler: [
+        validateParams(uuidParamSchema),
+        validateQuery(accountNotesQuerySchema),
+      ],
+    },
+    async (request, reply) => {
+      try {
+        const { id } = request.params as { id: string };
+        const { limit, offset, folderId } = request.query as {
+          limit: number;
+          offset: number;
+          folderId?: string;
+        };
+        await verifyServiceAccount(id);
+        const result = await getServiceAccountNotes(id, { folderId, limit, offset });
+        return result;
+      } catch (error) {
+        if (error instanceof AppError) {
+          return reply.status(error.statusCode).send({
+            error: error.name,
+            message: error.message,
+          });
+        }
+        fastify.log.error(error);
+        return reply.status(500).send({
+          error: 'Internal Server Error',
+          message: 'Failed to get service account notes',
+        });
+      }
+    }
+  );
+
+  // Get tags for a specific service account
+  fastify.get(
+    '/admin/service-accounts/:id/tags',
+    {
+      preHandler: validateParams(uuidParamSchema),
+    },
+    async (request, reply) => {
+      try {
+        const { id } = request.params as { id: string };
+        await verifyServiceAccount(id);
+        const result = await getServiceAccountTags(id);
+        return { tags: result };
+      } catch (error) {
+        if (error instanceof AppError) {
+          return reply.status(error.statusCode).send({
+            error: error.name,
+            message: error.message,
+          });
+        }
+        fastify.log.error(error);
+        return reply.status(500).send({
+          error: 'Internal Server Error',
+          message: 'Failed to get service account tags',
         });
       }
     }
