@@ -1,6 +1,6 @@
 # Notez API Reference
 
-> Generated from codebase analysis — last updated 2026-03-06
+> Generated from codebase analysis — last updated 2026-03-08
 
 ## Base URL
 
@@ -1926,3 +1926,194 @@ Rate limit: 120 requests/minute per token.
 | `GET` | `/api/v1/notes/:id/shares` | read | List shares for a note |
 | `PATCH` | `/api/v1/notes/:id/shares/:shareId` | write | Update share permission |
 | `DELETE` | `/api/v1/notes/:id/shares/:shareId` | write | Remove a share |
+
+---
+
+## Webhooks
+
+Webhooks push signed HTTP POST notifications to a registered endpoint whenever tasks, notes, or folders change. Auth uses session JWT or API token.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/webhooks` | Register a webhook |
+| `GET` | `/api/webhooks` | List all webhooks for the current user |
+| `GET` | `/api/webhooks/:id` | Get a specific webhook |
+| `PATCH` | `/api/webhooks/:id` | Update URL, events, status, or rotate secret |
+| `DELETE` | `/api/webhooks/:id` | Delete webhook and cancel pending deliveries |
+| `POST` | `/api/webhooks/:id/test` | Fire a synthetic test event |
+| `GET` | `/api/webhooks/:id/deliveries` | List delivery attempts |
+| `GET` | `/api/webhooks/:id/deliveries/:deliveryId` | Get a specific delivery |
+| `POST` | `/api/webhooks/:id/deliveries/:deliveryId/replay` | Re-fire a delivery |
+| `POST` | `/api/webhooks/:id/replay` | Bulk replay events for a time range |
+
+### Registration
+
+```http
+POST /api/webhooks
+Authorization: Bearer {token}
+Content-Type: application/json
+
+{
+  "url": "https://your-relay.example.com/webhook",
+  "events": ["task.created", "task.updated", "task.completed", "task.deleted"],
+  "secret": "whsec_your_signing_secret_min_16_chars",
+  "metadata": { "consumer": "pam-android", "device_id": "abc123" }
+}
+```
+
+- `events` — array of event type strings, or `["*"]` to subscribe to all events
+- `secret` — minimum 16 characters; stored encrypted; used for HMAC signing
+- `metadata` — optional arbitrary JSON; returned in GET responses but not in deliveries
+
+**Response:**
+```json
+{
+  "id": "wh_uuid",
+  "url": "https://your-relay.example.com/webhook",
+  "events": ["task.created", "task.updated"],
+  "status": "active",
+  "consecutiveFailures": 0,
+  "createdAt": "2026-03-08T14:32:00Z",
+  "updatedAt": "2026-03-08T14:32:00Z"
+}
+```
+
+**Limits:** Max 10 webhooks per user.
+
+### Event Types
+
+| Event | Trigger |
+|-------|---------|
+| `task.created` | Task created (API, UI, or import) |
+| `task.updated` | Task title, description, tags, folder, or any field modified |
+| `task.completed` | Task marked as done |
+| `task.uncompleted` | Task reopened (marked not done) |
+| `task.deleted` | Task permanently deleted |
+| `note.created` | Note created |
+| `note.updated` | Note title, content, tags, or folder modified |
+| `note.deleted` | Note moved to trash |
+| `folder.created` | Folder created |
+| `folder.updated` | Folder renamed or icon changed |
+| `folder.deleted` | Folder deleted |
+| `ping` | Synthetic test event (from the `/test` endpoint) |
+
+### Delivery Format
+
+```http
+POST {registered_url}
+Content-Type: application/json
+User-Agent: Notez-Webhooks/1.0
+X-Notez-Event: task.completed
+X-Notez-Delivery: del_unique_delivery_id
+X-Notez-Signature: sha256={hex_digest}
+X-Notez-Timestamp: 1709913120
+
+{
+  "id": "evt_uuid",
+  "event": "task.completed",
+  "timestamp": "2026-03-08T14:32:00Z",
+  "data": { ...full current entity state... },
+  "previous_data": { "status": "PENDING" }
+}
+```
+
+- `data` — full current state of the entity; consumer can update local state without a follow-up GET
+- `previous_data` — only the fields that changed, with their old values; omitted on `*.created` events
+
+### Signature Verification
+
+The signature is computed as:
+
+```
+HMAC-SHA256(secret, "v0:{timestamp}:{raw_body}")
+X-Notez-Signature: sha256={hex_digest}
+```
+
+The timestamp is part of the signed payload, enabling consumers to verify both authenticity and recency.
+
+**Node.js example:**
+```js
+const crypto = require('crypto');
+
+function verifyWebhook(req, secret) {
+  const signature = req.headers['x-notez-signature'];
+  const timestamp  = req.headers['x-notez-timestamp'];
+
+  // Reject events older than 5 minutes
+  if (Math.abs(Date.now() / 1000 - parseInt(timestamp)) > 300) {
+    throw new Error('Timestamp too old');
+  }
+
+  const payload  = `v0:${timestamp}:${req.rawBody}`;
+  const expected = 'sha256=' +
+    crypto.createHmac('sha256', secret).update(payload).digest('hex');
+
+  if (!crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature))) {
+    throw new Error('Invalid signature');
+  }
+}
+```
+
+Use `X-Notez-Delivery` for idempotency — retries reuse the same delivery ID.
+
+### Secret Rotation
+
+To rotate a secret without downtime:
+
+```http
+PATCH /api/webhooks/:id
+{ "secret": "whsec_new_secret" }
+```
+
+Both the old and new secrets are valid for **1 hour** after rotation. After that, only the new secret is valid. Update your consumer before the grace period expires.
+
+### Status Management
+
+`PATCH /api/webhooks/:id { "status": "paused" | "active" | "disabled" }`
+
+- `active` — deliveries enabled
+- `paused` — deliveries suspended; re-enable manually
+- `disabled` — set automatically after 50 consecutive failures; re-enable via `{ "status": "active" }`
+
+### Delivery & Retry
+
+- **Timeout:** 10 seconds per attempt
+- **Success:** HTTP 2xx
+- **Max attempts:** 7
+- **Backoff schedule:** immediate → 30s → 2m → 10m → 1h → 4h → 12h
+
+After 7 failures the delivery is marked `failed`. Use the replay endpoints to re-fire.
+
+### Bulk Replay
+
+```http
+POST /api/webhooks/:id/replay
+Content-Type: application/json
+
+{
+  "since": "2026-03-07T00:00:00Z",
+  "until": "2026-03-08T14:32:00Z",
+  "eventTypes": ["task.completed", "task.updated"]
+}
+```
+
+Queues matching events as new deliveries, staggered at 100ms each. Max 500 events per replay call.
+
+### Delivery Log Filters
+
+`GET /api/webhooks/:id/deliveries?status=failed&eventType=task.completed&since=2026-03-08T00:00:00Z&limit=50&offset=0`
+
+| Param | Values |
+|-------|--------|
+| `status` | `pending`, `success`, `failed`, `cancelled` |
+| `eventType` | any event type string |
+| `since` | ISO 8601 datetime |
+| `limit` | 1–100 (default 50) |
+| `offset` | integer (default 0) |
+
+### Data Retention
+
+- Delivery log: **30 days** (configurable via `WEBHOOK_DELIVERY_RETENTION_DAYS`)
+- Event log: **90 days** (configurable via `WEBHOOK_EVENT_RETENTION_DAYS`)

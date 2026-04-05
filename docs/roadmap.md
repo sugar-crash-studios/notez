@@ -250,11 +250,25 @@ These features are tracked but not yet prioritized:
 - **Nested folders** - Multi-level folder hierarchy
 - **Daily notes** - Auto-generated daily note template
 - **Graph visualization** - Visual note connections
-- **Webhooks** - ~~Integration with external services~~ ✅ (v1.17.0)
+- ~~**Webhooks** - Integration with external services~~ ✅ shipped in v1.17.0
 
 ---
 
 ## Recently Completed
+
+### v1.17.0 (2026-03-08)
+- Full webhook system — register HTTPS endpoints to receive signed push notifications for task/note/folder changes
+- HMAC-SHA256 signing with timestamp in signed payload (replay attack prevention)
+- 7-attempt exponential backoff delivery worker, auto-disable after 50 failures
+- Delivery log, replay, and bulk catch-up endpoints
+- Webhook settings UI in Settings → Webhooks
+- SSRF protection (blocks all private IP ranges including IPv4-mapped IPv6)
+
+### v1.16.0 (2026-03-07)
+- Code block copy button
+
+### v1.15.0 (2026-03-06)
+- Versioned external API at `/api/v1/`
 
 ### v1.8.0 (2026-02-27)
 - Public-readiness: PII scrub, sanitized compose files and docs
