@@ -218,50 +218,58 @@ export function ServiceAccountWorkspace({
             ) : (
               <div className="py-2">
                 {/* Folders Section */}
-                <div className="px-3 py-1 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                <div className="px-3 py-1 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider" id="folders-label">
                   Folders
                 </div>
 
-                {/* All Notes */}
-                <button
-                  onClick={() => { setSelectedFolderId(null); setSelectedTagId(null); }}
-                  className={`w-full px-3 py-1.5 flex items-center gap-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
-                    !selectedFolderId && !selectedTagId ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-700 dark:text-gray-300'
-                  }`}
-                >
-                  <FileText className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span className="truncate">All Notes</span>
-                  <span className="ml-auto text-xs text-gray-400">{totalNoteCount}</span>
-                </button>
-
-                {/* Individual folders */}
-                {folders.map((folder) => (
+                <div role="listbox" aria-labelledby="folders-label">
+                  {/* All Notes */}
                   <button
-                    key={folder.id}
-                    onClick={() => { setSelectedFolderId(folder.id); setSelectedTagId(null); }}
+                    role="option"
+                    aria-selected={!selectedFolderId && !selectedTagId}
+                    onClick={() => { setSelectedFolderId(null); setSelectedTagId(null); }}
                     className={`w-full px-3 py-1.5 flex items-center gap-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
-                      selectedFolderId === folder.id ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-700 dark:text-gray-300'
-                    }`}
-                  >
-                    <Folder className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span className="truncate">{folder.name}</span>
-                    <span className="ml-auto text-xs text-gray-400">{folder.noteCount}</span>
-                  </button>
-                ))}
-
-                {/* Unfiled */}
-                {unfiledCount > 0 && (
-                  <button
-                    onClick={() => { setSelectedFolderId('unfiled'); setSelectedTagId(null); }}
-                    className={`w-full px-3 py-1.5 flex items-center gap-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
-                      selectedFolderId === 'unfiled' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-500 dark:text-gray-400'
+                      !selectedFolderId && !selectedTagId ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-700 dark:text-gray-300'
                     }`}
                   >
                     <FileText className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span className="truncate">Unfiled</span>
-                    <span className="ml-auto text-xs text-gray-400">{unfiledCount}</span>
+                    <span className="truncate">All Notes</span>
+                    <span className="ml-auto text-xs text-gray-400">{totalNoteCount}</span>
                   </button>
-                )}
+
+                  {/* Individual folders */}
+                  {folders.map((folder) => (
+                    <button
+                      key={folder.id}
+                      role="option"
+                      aria-selected={selectedFolderId === folder.id}
+                      onClick={() => { setSelectedFolderId(folder.id); setSelectedTagId(null); }}
+                      className={`w-full px-3 py-1.5 flex items-center gap-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
+                        selectedFolderId === folder.id ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-700 dark:text-gray-300'
+                      }`}
+                    >
+                      <Folder className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span className="truncate">{folder.name}</span>
+                      <span className="ml-auto text-xs text-gray-400">{folder.noteCount}</span>
+                    </button>
+                  ))}
+
+                  {/* Unfiled */}
+                  {unfiledCount > 0 && (
+                    <button
+                      role="option"
+                      aria-selected={selectedFolderId === 'unfiled'}
+                      onClick={() => { setSelectedFolderId('unfiled'); setSelectedTagId(null); }}
+                      className={`w-full px-3 py-1.5 flex items-center gap-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
+                        selectedFolderId === 'unfiled' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-500 dark:text-gray-400'
+                      }`}
+                    >
+                      <FileText className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span className="truncate">Unfiled</span>
+                      <span className="ml-auto text-xs text-gray-400">{unfiledCount}</span>
+                    </button>
+                  )}
+                </div>
 
                 {folders.length === 0 && unfiledCount === 0 && (
                   <p className="px-3 py-2 text-xs text-gray-400 dark:text-gray-500">No folders</p>
@@ -270,22 +278,26 @@ export function ServiceAccountWorkspace({
                 {/* Tags Section */}
                 {tags.length > 0 && (
                   <>
-                    <div className="px-3 py-1 mt-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                    <div className="px-3 py-1 mt-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider" id="tags-label">
                       Tags
                     </div>
-                    {tags.map((tag) => (
-                      <button
-                        key={tag.id}
-                        onClick={() => { setSelectedTagId(tag.id); setSelectedFolderId(null); }}
-                        className={`w-full px-3 py-1.5 flex items-center gap-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
-                          selectedTagId === tag.id ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-700 dark:text-gray-300'
-                        }`}
-                      >
-                        <Tag className="w-3.5 h-3.5 flex-shrink-0" />
-                        <span className="truncate">{tag.name}</span>
-                        <span className="ml-auto text-xs text-gray-400">{tag.usageCount}</span>
-                      </button>
-                    ))}
+                    <div role="listbox" aria-labelledby="tags-label">
+                      {tags.map((tag) => (
+                        <button
+                          key={tag.id}
+                          role="option"
+                          aria-selected={selectedTagId === tag.id}
+                          onClick={() => { setSelectedTagId(tag.id); setSelectedFolderId(null); }}
+                          className={`w-full px-3 py-1.5 flex items-center gap-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
+                            selectedTagId === tag.id ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-700 dark:text-gray-300'
+                          }`}
+                        >
+                          <Tag className="w-3.5 h-3.5 flex-shrink-0" />
+                          <span className="truncate">{tag.name}</span>
+                          <span className="ml-auto text-xs text-gray-400">{tag.usageCount}</span>
+                        </button>
+                      ))}
+                    </div>
                   </>
                 )}
 
@@ -401,7 +413,7 @@ export function ServiceAccountWorkspace({
         /* Activity Tab Placeholder */
         <div className="flex-1 flex items-center justify-center text-gray-400 dark:text-gray-500">
           <div className="text-center">
-            <p className="text-sm">Activity timeline coming in v1.20.0</p>
+            <p className="text-sm">Activity timeline coming soon</p>
           </div>
         </div>
       )}

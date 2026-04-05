@@ -4,7 +4,7 @@ import { hashPassword } from './auth.service.js';
 import { createApiToken } from './token.service.js';
 import type { CreateUserInput, UpdateUserInput } from '../utils/validation.schemas.js';
 import { APP_VERSION, NODE_VERSION } from '../config/app.config.js';
-import { BadRequestError } from '../utils/errors.js';
+import { AppError, BadRequestError } from '../utils/errors.js';
 
 /** Common select fields for user queries */
 const userSelect = {
@@ -359,9 +359,26 @@ export async function listServiceAccountTasks(options?: { limit?: number; offset
 }
 
 /**
+ * Verify a user ID belongs to a service account. Throws if not found or not a service account.
+ */
+async function verifyServiceAccountUser(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { isServiceAccount: true },
+  });
+  if (!user) {
+    throw new AppError('Service account not found', 404);
+  }
+  if (!user.isServiceAccount) {
+    throw new AppError('User is not a service account', 400);
+  }
+}
+
+/**
  * Get folders for a specific service account (admin read-only)
  */
 export async function getServiceAccountFolders(userId: string) {
+  await verifyServiceAccountUser(userId);
   const folders = await prisma.folder.findMany({
     where: { userId },
     select: {
@@ -402,6 +419,7 @@ export async function getServiceAccountNotes(
   userId: string,
   options?: { folderId?: string | null; limit?: number; offset?: number }
 ) {
+  await verifyServiceAccountUser(userId);
   const limit = options?.limit ?? 50;
   const offset = options?.offset ?? 0;
 
@@ -449,6 +467,7 @@ export async function getServiceAccountNotes(
  * Get tags for a specific service account with usage counts (admin read-only)
  */
 export async function getServiceAccountTags(userId: string) {
+  await verifyServiceAccountUser(userId);
   const tags = await prisma.tag.findMany({
     where: { userId },
     select: {
@@ -469,6 +488,8 @@ export async function getServiceAccountTags(userId: string) {
     id: t.id,
     name: t.name,
     createdAt: t.createdAt,
+    noteCount: t._count.notes,
+    taskCount: t._count.taskTags,
     usageCount: t._count.notes + t._count.taskTags,
   }));
 }

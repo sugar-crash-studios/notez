@@ -213,9 +213,7 @@ export function EditorPage() {
           className={`${mobileView === 'list' ? 'block' : 'hidden'} xl:block flex-shrink-0`}
           style={selectedFolderId === 'service-accounts' && !selectedServiceAccount
             ? { width: '100%', flex: 1 }
-            : selectedFolderId === 'service-accounts' && selectedServiceAccount
-              ? { width: '100%', maxWidth: '600px', flex: '0 0 auto' }
-              : { width: listWidth }}
+            : { width: listWidth }}
         >
           {/* Service Account Dashboard (no account selected yet) */}
           {selectedFolderId === 'service-accounts' && !selectedServiceAccount ? (
@@ -281,8 +279,8 @@ export function EditorPage() {
           )}
         </div>
 
-        {/* List Resize Handle - hidden for service account views */}
-        {selectedFolderId !== 'service-accounts' && (
+        {/* List Resize Handle - hidden only for full-width dashboard */}
+        {!(selectedFolderId === 'service-accounts' && !selectedServiceAccount) && (
           <ResizeHandle
             onResize={handleListResize}
             onResizeEnd={saveListWidth}

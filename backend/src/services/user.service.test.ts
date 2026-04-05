@@ -842,6 +842,11 @@ describe('user.service', () => {
 
   // ─── getServiceAccountFolders ──────────────────────────────────────────
   describe('getServiceAccountFolders', () => {
+    beforeEach(() => {
+      // All per-account methods now verify the user is a service account
+      mockPrisma.user.findUnique.mockResolvedValue({ isServiceAccount: true } as any);
+    });
+
     it('should return folders with note counts', async () => {
       (mockPrisma.folder as any).findMany.mockResolvedValue([
         { id: 'f1', name: 'Research', icon: 'folder', createdAt: new Date(), updatedAt: new Date(), _count: { notes: 3 } },
@@ -877,10 +882,26 @@ describe('user.service', () => {
         expect.objectContaining({ where: { userId: 'sa-42' } })
       );
     });
+
+    it('should throw 404 for non-existent user', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(getServiceAccountFolders('nonexistent')).rejects.toThrow('Service account not found');
+    });
+
+    it('should throw 400 for non-service-account user', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ isServiceAccount: false } as any);
+
+      await expect(getServiceAccountFolders('regular-user')).rejects.toThrow('User is not a service account');
+    });
   });
 
   // ─── getServiceAccountNotes ───────────────────────────────────────────
   describe('getServiceAccountNotes', () => {
+    beforeEach(() => {
+      mockPrisma.user.findUnique.mockResolvedValue({ isServiceAccount: true } as any);
+    });
+
     it('should return notes with tags mapped', async () => {
       mockPrisma.note.findMany.mockResolvedValue([
         {
@@ -934,11 +955,21 @@ describe('user.service', () => {
         expect.objectContaining({ take: 25, skip: 50 })
       );
     });
+
+    it('should throw 404 for non-existent user', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(getServiceAccountNotes('nonexistent')).rejects.toThrow('Service account not found');
+    });
   });
 
   // ─── getServiceAccountTags ────────────────────────────────────────────
   describe('getServiceAccountTags', () => {
-    it('should return tags with usage counts', async () => {
+    beforeEach(() => {
+      mockPrisma.user.findUnique.mockResolvedValue({ isServiceAccount: true } as any);
+    });
+
+    it('should return tags with split and combined usage counts', async () => {
       (mockPrisma.tag as any).findMany.mockResolvedValue([
         { id: 't1', name: 'security', createdAt: new Date(), _count: { notes: 3, taskTags: 2 } },
         { id: 't2', name: 'architecture', createdAt: new Date(), _count: { notes: 1, taskTags: 0 } },
@@ -948,7 +979,11 @@ describe('user.service', () => {
 
       expect(result).toHaveLength(2);
       expect(result[0].name).toBe('security');
+      expect(result[0].noteCount).toBe(3);
+      expect(result[0].taskCount).toBe(2);
       expect(result[0].usageCount).toBe(5); // 3 + 2
+      expect(result[1].noteCount).toBe(1);
+      expect(result[1].taskCount).toBe(0);
       expect(result[1].usageCount).toBe(1); // 1 + 0
     });
 
@@ -968,6 +1003,18 @@ describe('user.service', () => {
       expect((mockPrisma.tag as any).findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { userId: 'sa-42' } })
       );
+    });
+
+    it('should throw 404 for non-existent user', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(getServiceAccountTags('nonexistent')).rejects.toThrow('Service account not found');
+    });
+
+    it('should throw 400 for non-service-account user', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ isServiceAccount: false } as any);
+
+      await expect(getServiceAccountTags('regular-user')).rejects.toThrow('User is not a service account');
     });
   });
 

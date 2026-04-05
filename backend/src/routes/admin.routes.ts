@@ -151,7 +151,6 @@ export async function adminRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       try {
         const { id } = request.params as { id: string };
-        await verifyServiceAccount(id);
         const result = await getServiceAccountFolders(id);
         return result;
       } catch (error) {
@@ -187,7 +186,6 @@ export async function adminRoutes(fastify: FastifyInstance) {
           offset: number;
           folderId?: string;
         };
-        await verifyServiceAccount(id);
         const result = await getServiceAccountNotes(id, { folderId, limit, offset });
         return result;
       } catch (error) {
@@ -215,7 +213,6 @@ export async function adminRoutes(fastify: FastifyInstance) {
     async (request, reply) => {
       try {
         const { id } = request.params as { id: string };
-        await verifyServiceAccount(id);
         const result = await getServiceAccountTags(id);
         return { tags: result };
       } catch (error) {
