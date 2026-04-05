@@ -212,6 +212,30 @@ Native iOS/Android applications:
 
 ---
 
+## Up Next: Service Account Visibility (v1.18.0-v1.20.0)
+
+> **Goal:** Give admins proper oversight into service account activity
+
+### Service Account Dashboard (v1.18.0) -- PR #18
+- [x] Card-based dashboard with per-account stats
+- [x] Health indicators (token expiry, dormancy, no active tokens)
+- [x] Server-side filtering by specific service account
+- [ ] Account workspace drill-down with folder tree (v1.19.0)
+- [ ] Activity timeline showing agent actions (v1.20.0)
+
+### Agent Accounts (v1.21.0-v1.23.0) -- Planned
+
+> **Goal:** Per-user AI agent support with content attribution
+
+- [ ] Agent tokens: API tokens with `isAgent` flag + display config (name, icon, color) (v1.21.0)
+- [ ] Content attribution: `createdByTokenId` FK on notes/folders/tags/tasks (v1.21.0)
+- [ ] User settings: "My Agents" section for agent token management (v1.22.0)
+- [ ] Sidebar: "Agents" section with namespace filtering + mixed-view toggle (v1.23.0)
+- [ ] Agent content badges/visual indicators on notes and folders (v1.23.0)
+- [ ] Data migration: move existing claude-agent content to personal agent account (v1.23.0)
+
+---
+
 ## Backlog (Unscheduled)
 
 These features are tracked but not yet prioritized:
