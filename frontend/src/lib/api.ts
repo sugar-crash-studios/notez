@@ -204,6 +204,16 @@ export const serviceAccountsApi = {
   listTasks: (params?: { limit?: number; offset?: number }) =>
     api.get('/api/admin/service-accounts/tasks', { params }),
 
+  // Per-account workspace endpoints
+  getAccountFolders: (id: string) =>
+    api.get(`/api/admin/service-accounts/${id}/folders`),
+
+  getAccountNotes: (id: string, params?: { folderId?: string; limit?: number; offset?: number }) =>
+    api.get(`/api/admin/service-accounts/${id}/notes`, { params }),
+
+  getAccountTags: (id: string) =>
+    api.get(`/api/admin/service-accounts/${id}/tags`),
+
   listTokens: (id: string) =>
     api.get(`/api/admin/service-accounts/${id}/tokens`),
 
