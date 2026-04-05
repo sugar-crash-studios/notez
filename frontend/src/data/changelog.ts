@@ -12,6 +12,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '1.20.0',
+    date: '2026-04-05',
+    added: [
+      'Service Account Dashboard — admins now see a card-based overview with stats, health badges, and recent activity for each service account',
+      'Service Account Workspace — drill into any service account to browse its folders, tags, and notes with search and pagination',
+      'Activity Timeline — see what each service account has been doing in a reverse-chronological stream with smart grouping and filters',
+    ],
+  },
+  {
     version: '1.17.0',
     date: '2026-03-08',
     added: [

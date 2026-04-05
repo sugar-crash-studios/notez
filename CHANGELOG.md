@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.20.0] - 2026-04-05
+
+### Added
+
+- **Service account activity timeline** (EPIC-003): Reverse-chronological stream showing what each service account has been doing. Merges notes, tasks, and folders into a single sorted timeline with cursor-based pagination.
+  - `GET /admin/service-accounts/:id/activity?limit=50&before=<cursor>` - merged activity endpoint
+  - Action derived from timestamps: "Created" when `createdAt ~= updatedAt`, "Updated" otherwise
+  - Activity grouping: consecutive same-type/action/folder items within 5 minutes collapse into expandable groups (e.g., "Created 12 notes in Research")
+  - Filter dropdowns: by action type (created/updated) and content type (notes/tasks/folders)
+  - Click-through: note items open in read-only viewer
+  - Date section headers (Today, Yesterday, formatted dates)
+  - Cursor uses `lte` with client-side deduplication to avoid skipping items with identical timestamps
+
+## [1.19.0] - 2026-04-05
+
+### Added
+
+- **Service account workspace drill-down** (EPIC-002): Full browsable workspace when clicking into a service account from the dashboard.
+  - `GET /admin/service-accounts/:id/folders` - folder tree with note counts per folder + unfiled count
+  - `GET /admin/service-accounts/:id/notes?folderId=X&limit=50&offset=0` - paginated notes with tags (no longer stripped)
+  - `GET /admin/service-accounts/:id/tags` - tags with split noteCount/taskCount + combined usageCount
+  - Folder tree sidebar with tag list, "All Notes" and "Unfiled" sections
+  - Search within account, paginated note list with Load More
+  - Content/Activity tab bar (Activity tab implemented in v1.20.0)
+  - All per-account endpoints validate service account ownership (404 for non-SA, 400 for regular user)
+  - `folderId` query param validated as UUID or literal `'unfiled'`
+  - ARIA listbox/option roles with `aria-selected` on folder and tag sidebar items
+
+## [1.18.0] - 2026-04-05
+
+### Added
+
+- **Service account dashboard** (EPIC-001): Card-based overview replacing the flat note dump when clicking "Service Accounts" in the admin sidebar.
+  - `GET /admin/service-accounts/stats` - per-account aggregate stats (note/folder/tag/task counts, lastActivity, recent notes, token health)
+  - Dashboard cards with health warning badges: token expiring (amber), token expired (red), dormant account >30d (amber), no active tokens (red)
+  - Click card to drill into account workspace (EPIC-002)
+  - Server-side `userId` filter on `GET /admin/service-accounts/notes` endpoint (fixes client-side filtering bug)
+  - Typed `ServiceAccountStat` interface shared between API and frontend
+  - Full accessibility: `focus-visible` ring, `aria-label` on cards and buttons, `role="status"` on loading, `role="alert"` on error
+
 ## [1.17.0] - 2026-03-08
 
 ### Added
