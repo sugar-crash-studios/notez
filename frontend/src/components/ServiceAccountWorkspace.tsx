@@ -39,9 +39,11 @@ interface ActivityItem {
 
 type GroupedActivity = {
   kind: 'single';
+  key: string;
   item: ActivityItem;
 } | {
   kind: 'group';
+  key: string;
   action: string;
   type: string;
   folder: { id: string; name: string } | null;
@@ -79,10 +81,11 @@ export function groupActivityItems(items: ActivityItem[]): GroupedActivity[] {
     }
 
     if (batch.length === 1) {
-      groups.push({ kind: 'single', item: batch[0] });
+      groups.push({ kind: 'single', key: `${batch[0].type}-${batch[0].id}`, item: batch[0] });
     } else {
       groups.push({
         kind: 'group',
+        key: `group-${current.action}-${current.type}-${current.folder?.id ?? 'null'}-${current.timestamp}`,
         action: current.action,
         type: current.type,
         folder: current.folder,
@@ -521,7 +524,7 @@ function ActivityTimeline({ accountId, onSelectNote }: { accountId: string; onSe
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<ActivityFilter>({ actionType: 'all', contentType: 'all' });
-  const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -548,7 +551,12 @@ function ActivityTimeline({ accountId, onSelectNote }: { accountId: string; onSe
     if (!nextCursor) return;
     try {
       const res = await serviceAccountsApi.getAccountActivity(accountId, { limit: 50, before: nextCursor });
-      setItems((prev) => [...prev, ...res.data.items]);
+      // Deduplicate by type+id since lte cursor may return overlapping items
+      setItems((prev) => {
+        const seen = new Set(prev.map((i) => `${i.type}-${i.id}`));
+        const newItems = res.data.items.filter((i: ActivityItem) => !seen.has(`${i.type}-${i.id}`));
+        return [...prev, ...newItems];
+      });
       setHasMore(res.data.hasMore);
       setNextCursor(res.data.nextCursor);
     } catch {
@@ -579,10 +587,10 @@ function ActivityTimeline({ accountId, onSelectNote }: { accountId: string; onSe
     }
   }
 
-  const toggleGroup = (idx: number) => {
+  const toggleGroup = (key: string) => {
     setExpandedGroups((prev) => {
       const next = new Set(prev);
-      if (next.has(idx)) next.delete(idx); else next.add(idx);
+      if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
   };
@@ -595,6 +603,7 @@ function ActivityTimeline({ accountId, onSelectNote }: { accountId: string; onSe
     <div className="flex-1 flex flex-col min-h-0">
       {/* Filters */}
       <div className="flex items-center gap-2 p-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <span className="text-xs text-gray-500 dark:text-gray-400">Filters:</span>
         <select
           value={filter.actionType}
           onChange={(e) => setFilter((f) => ({ ...f, actionType: e.target.value as ActivityFilter['actionType'] }))}
@@ -616,7 +625,7 @@ function ActivityTimeline({ accountId, onSelectNote }: { accountId: string; onSe
           <option value="task">Tasks</option>
           <option value="folder">Folders</option>
         </select>
-        <span className="text-xs text-gray-400 ml-auto">
+        <span className="text-xs text-gray-400 ml-auto" aria-live="polite">
           {filtered.length} items
         </span>
       </div>
@@ -634,17 +643,18 @@ function ActivityTimeline({ accountId, onSelectNote }: { accountId: string; onSe
                 <div className="sticky top-0 px-4 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-700">
                   {dg.label}
                 </div>
-                {dg.items.map((g, idx) => {
-                  const globalIdx = grouped.indexOf(g);
+                {dg.items.map((g) => {
                   if (g.kind === 'single') {
                     const item = g.item;
                     const Icon = typeIcons[item.type];
+                    const isClickable = item.type === 'note';
+                    const Element = isClickable ? 'button' : 'div';
                     return (
-                      <button
-                        key={`${item.type}-${item.id}-${idx}`}
-                        onClick={() => item.type === 'note' && onSelectNote(item.id)}
+                      <Element
+                        key={g.key}
+                        {...(isClickable ? { onClick: () => onSelectNote(item.id) } : {})}
                         className={`w-full px-4 py-2.5 flex items-start gap-3 text-left border-b border-gray-100 dark:border-gray-700 ${
-                          item.type === 'note' ? 'hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer' : 'cursor-default'
+                          isClickable ? 'hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer' : ''
                         }`}
                       >
                         <span className="text-xs text-gray-400 dark:text-gray-500 w-12 flex-shrink-0 pt-0.5">
@@ -676,16 +686,16 @@ function ActivityTimeline({ accountId, onSelectNote }: { accountId: string; onSe
                             <span className="text-xs text-gray-400 dark:text-gray-500 ml-2">({item.status})</span>
                           )}
                         </div>
-                      </button>
+                      </Element>
                     );
                   } else {
                     // Group
-                    const isExpanded = expandedGroups.has(globalIdx);
+                    const isExpanded = expandedGroups.has(g.key);
                     const Icon = typeIcons[g.type as keyof typeof typeIcons] ?? FileText;
                     return (
-                      <div key={`group-${globalIdx}`} className="border-b border-gray-100 dark:border-gray-700">
+                      <div key={g.key} className="border-b border-gray-100 dark:border-gray-700">
                         <button
-                          onClick={() => toggleGroup(globalIdx)}
+                          onClick={() => toggleGroup(g.key)}
                           className="w-full px-4 py-2.5 flex items-start gap-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50"
                           aria-expanded={isExpanded}
                         >

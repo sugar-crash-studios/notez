@@ -1096,11 +1096,11 @@ describe('user.service', () => {
 
       await getServiceAccountActivity('sa-1', { before: '2026-04-05T12:00:00Z' });
 
-      // Check that updatedAt filter was passed
+      // Uses lte (not lt) to avoid skipping items with identical timestamps
       expect(mockPrisma.note.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            updatedAt: { lt: new Date('2026-04-05T12:00:00Z') },
+            updatedAt: { lte: new Date('2026-04-05T12:00:00Z') },
           }),
         })
       );

@@ -129,4 +129,32 @@ describe('groupActivityItems', () => {
     expect(result[1].kind).toBe('single');
     expect(result[2].kind).toBe('group');
   });
+
+  it('should assign stable keys to singles and groups', () => {
+    const folder = { id: 'f1', name: 'Research' };
+    const items = [
+      makeItem({ id: 'n1', type: 'note', action: 'created', folder, timestamp: '2026-04-05T14:02:00Z' }),
+      makeItem({ id: 'n2', type: 'note', action: 'created', folder, timestamp: '2026-04-05T14:01:00Z' }),
+      makeItem({ id: 't1', type: 'task', action: 'updated', timestamp: '2026-04-05T13:00:00Z' }),
+    ];
+
+    const result = groupActivityItems(items);
+
+    expect(result).toHaveLength(2);
+    // Group key is content-based, not index-based
+    expect(result[0].key).toBe('group-created-note-f1-2026-04-05T14:02:00Z');
+    // Single key uses type-id
+    expect(result[1].key).toBe('task-t1');
+  });
+
+  it('should produce consistent keys across re-renders', () => {
+    const items = [
+      makeItem({ id: 'n1', type: 'note', action: 'created', timestamp: '2026-04-05T14:00:00Z' }),
+    ];
+
+    const result1 = groupActivityItems(items);
+    const result2 = groupActivityItems(items);
+
+    expect(result1[0].key).toBe(result2[0].key);
+  });
 });

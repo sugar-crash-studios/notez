@@ -512,8 +512,9 @@ export async function getServiceAccountActivity(
   const limit = Math.min(options?.limit ?? 50, 100);
   const beforeDate = options?.before ? new Date(options.before) : undefined;
 
-  // Build date filter for cursor pagination
-  const dateFilter = beforeDate ? { lt: beforeDate } : undefined;
+  // Use lte (not lt) to avoid skipping items with identical timestamps in batch operations.
+  // Frontend deduplicates by ID when appending pages.
+  const dateFilter = beforeDate ? { lte: beforeDate } : undefined;
 
   // Fetch notes, tasks, and folders in parallel
   const [notes, tasks, folders] = await Promise.all([
@@ -568,7 +569,9 @@ export async function getServiceAccountActivity(
     }),
   ]);
 
-  // Derive action: created if createdAt ~= updatedAt (within 1 second)
+  // Derive action: created if createdAt ~= updatedAt (within 1 second).
+  // Known limitation: under heavy DB load, creation timestamps may drift >1s,
+  // causing new items to show as "updated". No fix without an explicit action column.
   function deriveAction(createdAt: Date, updatedAt: Date): 'created' | 'updated' {
     return Math.abs(createdAt.getTime() - updatedAt.getTime()) < 1000 ? 'created' : 'updated';
   }
