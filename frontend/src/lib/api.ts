@@ -214,6 +214,9 @@ export const serviceAccountsApi = {
   getAccountTags: (id: string) =>
     api.get(`/api/admin/service-accounts/${id}/tags`),
 
+  getAccountActivity: (id: string, params?: { limit?: number; before?: string }) =>
+    api.get(`/api/admin/service-accounts/${id}/activity`, { params }),
+
   listTokens: (id: string) =>
     api.get(`/api/admin/service-accounts/${id}/tokens`),
 

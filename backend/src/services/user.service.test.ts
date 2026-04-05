@@ -83,6 +83,7 @@ import {
   getServiceAccountFolders,
   getServiceAccountNotes,
   getServiceAccountTags,
+  getServiceAccountActivity,
 } from './user.service.js';
 import { prisma } from '../lib/db.js';
 
@@ -1015,6 +1016,129 @@ describe('user.service', () => {
       mockPrisma.user.findUnique.mockResolvedValue({ isServiceAccount: false } as any);
 
       await expect(getServiceAccountTags('regular-user')).rejects.toThrow('User is not a service account');
+    });
+  });
+
+  // ─── getServiceAccountActivity ──────────────────────────────────────────
+  describe('getServiceAccountActivity', () => {
+    beforeEach(() => {
+      mockPrisma.user.findUnique.mockResolvedValue({ isServiceAccount: true } as any);
+    });
+
+    const now = new Date('2026-04-05T14:00:00Z');
+
+    it('should merge notes, tasks, and folders into a sorted timeline', async () => {
+      mockPrisma.note.findMany.mockResolvedValue([
+        { id: 'n1', title: 'Note 1', createdAt: now, updatedAt: now, folderId: null, folder: null, tags: [] },
+      ] as any);
+      mockPrisma.task.findMany.mockResolvedValue([
+        { id: 't1', title: 'Task 1', status: 'TODO', createdAt: new Date('2026-04-05T13:00:00Z'), updatedAt: new Date('2026-04-05T13:30:00Z'), folderId: null, folder: null },
+      ] as any);
+      (mockPrisma.folder as any).findMany.mockResolvedValue([
+        { id: 'f1', name: 'Research', createdAt: new Date('2026-04-05T12:00:00Z'), updatedAt: new Date('2026-04-05T12:00:00Z') },
+      ]);
+
+      const result = await getServiceAccountActivity('sa-1');
+
+      expect(result.items).toHaveLength(3);
+      // Sorted by timestamp descending
+      expect(result.items[0].type).toBe('note');
+      expect(result.items[1].type).toBe('task');
+      expect(result.items[2].type).toBe('folder');
+    });
+
+    it('should derive action as "created" when createdAt equals updatedAt', async () => {
+      const ts = new Date('2026-04-05T10:00:00Z');
+      mockPrisma.note.findMany.mockResolvedValue([
+        { id: 'n1', title: 'New Note', createdAt: ts, updatedAt: ts, folderId: null, folder: null, tags: [] },
+      ] as any);
+      mockPrisma.task.findMany.mockResolvedValue([]);
+      (mockPrisma.folder as any).findMany.mockResolvedValue([]);
+
+      const result = await getServiceAccountActivity('sa-1');
+
+      expect(result.items[0].action).toBe('created');
+    });
+
+    it('should derive action as "updated" when createdAt differs from updatedAt', async () => {
+      mockPrisma.note.findMany.mockResolvedValue([
+        { id: 'n1', title: 'Old Note', createdAt: new Date('2026-04-01T10:00:00Z'), updatedAt: new Date('2026-04-05T10:00:00Z'), folderId: null, folder: null, tags: [] },
+      ] as any);
+      mockPrisma.task.findMany.mockResolvedValue([]);
+      (mockPrisma.folder as any).findMany.mockResolvedValue([]);
+
+      const result = await getServiceAccountActivity('sa-1');
+
+      expect(result.items[0].action).toBe('updated');
+    });
+
+    it('should include tags for notes and status for tasks', async () => {
+      mockPrisma.note.findMany.mockResolvedValue([
+        { id: 'n1', title: 'Note', createdAt: now, updatedAt: now, folderId: null, folder: null, tags: [{ tag: { id: 't1', name: 'security' } }] },
+      ] as any);
+      mockPrisma.task.findMany.mockResolvedValue([
+        { id: 'task1', title: 'Task', status: 'IN_PROGRESS', createdAt: now, updatedAt: now, folderId: null, folder: null },
+      ] as any);
+      (mockPrisma.folder as any).findMany.mockResolvedValue([]);
+
+      const result = await getServiceAccountActivity('sa-1');
+
+      const note = result.items.find((i: any) => i.type === 'note');
+      expect(note?.tags).toEqual([{ id: 't1', name: 'security' }]);
+      const task = result.items.find((i: any) => i.type === 'task');
+      expect(task?.status).toBe('IN_PROGRESS');
+    });
+
+    it('should support cursor-based pagination with before param', async () => {
+      mockPrisma.note.findMany.mockResolvedValue([]);
+      mockPrisma.task.findMany.mockResolvedValue([]);
+      (mockPrisma.folder as any).findMany.mockResolvedValue([]);
+
+      await getServiceAccountActivity('sa-1', { before: '2026-04-05T12:00:00Z' });
+
+      // Uses lte (not lt) to avoid skipping items with identical timestamps
+      expect(mockPrisma.note.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            updatedAt: { lte: new Date('2026-04-05T12:00:00Z') },
+          }),
+        })
+      );
+    });
+
+    it('should set hasMore when items exceed limit', async () => {
+      // Create 3 notes, request limit of 2
+      mockPrisma.note.findMany.mockResolvedValue([
+        { id: 'n1', title: 'A', createdAt: now, updatedAt: now, folderId: null, folder: null, tags: [] },
+        { id: 'n2', title: 'B', createdAt: now, updatedAt: now, folderId: null, folder: null, tags: [] },
+        { id: 'n3', title: 'C', createdAt: now, updatedAt: now, folderId: null, folder: null, tags: [] },
+      ] as any);
+      mockPrisma.task.findMany.mockResolvedValue([]);
+      (mockPrisma.folder as any).findMany.mockResolvedValue([]);
+
+      const result = await getServiceAccountActivity('sa-1', { limit: 2 });
+
+      expect(result.items).toHaveLength(2);
+      expect(result.hasMore).toBe(true);
+      expect(result.nextCursor).toBeTruthy();
+    });
+
+    it('should return empty timeline for account with no content', async () => {
+      mockPrisma.note.findMany.mockResolvedValue([]);
+      mockPrisma.task.findMany.mockResolvedValue([]);
+      (mockPrisma.folder as any).findMany.mockResolvedValue([]);
+
+      const result = await getServiceAccountActivity('sa-1');
+
+      expect(result.items).toEqual([]);
+      expect(result.hasMore).toBe(false);
+      expect(result.nextCursor).toBeNull();
+    });
+
+    it('should throw 404 for non-existent user', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(getServiceAccountActivity('nonexistent')).rejects.toThrow('Service account not found');
     });
   });
 
