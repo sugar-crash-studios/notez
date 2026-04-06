@@ -45,6 +45,8 @@ const appendNoteBody = z.object({
 
 const listTasksQuery = z.object({
   status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']).optional(),
+  createdByTokenId: z.string().uuid().optional(),
+  agentCreated: z.coerce.boolean().optional(),
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 
@@ -72,6 +74,8 @@ const listNotesQuery = z.object({
   ).optional(),
   tagId: z.string().uuid().optional(),
   search: z.string().max(200).optional(),
+  createdByTokenId: z.string().uuid().optional(),
+  agentCreated: z.coerce.boolean().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0),
 });
@@ -248,6 +252,8 @@ export async function mcpRoutes(fastify: FastifyInstance) {
         folderId: query.folderId,
         tagId: query.tagId,
         search: query.search,
+        createdByTokenId: query.createdByTokenId,
+        agentCreated: query.agentCreated,
         limit: query.limit,
         offset: query.offset,
       });
@@ -292,7 +298,7 @@ export async function mcpRoutes(fastify: FastifyInstance) {
       const userId = request.user!.userId;
       const body = request.body as z.infer<typeof createNoteBody>;
 
-      const note = await createNote(userId, body);
+      const note = await createNote(userId, body, request.apiTokenId);
       reply.code(201);
       return note;
     }
@@ -317,7 +323,7 @@ export async function mcpRoutes(fastify: FastifyInstance) {
         throw new BadRequestError('Note content would exceed maximum size (500KB)');
       }
 
-      return updateNote(id, userId, { content: newContent });
+      return updateNote(id, userId, { content: newContent }, request.apiTokenId);
     }
   );
 
@@ -330,7 +336,7 @@ export async function mcpRoutes(fastify: FastifyInstance) {
       const { id } = request.params as { id: string };
       const body = request.body as z.infer<typeof updateNoteBody>;
 
-      return updateNote(id, userId, body);
+      return updateNote(id, userId, body, request.apiTokenId);
     }
   );
 
@@ -366,10 +372,12 @@ export async function mcpRoutes(fastify: FastifyInstance) {
     { config: perTokenRateLimit, preHandler: [requireScope('read'), validateQuery(listTasksQuery)] },
     async (request: FastifyRequest) => {
       const userId = request.user!.userId;
-      const { status, limit } = request.query as z.infer<typeof listTasksQuery>;
+      const { status, createdByTokenId, agentCreated, limit } = request.query as z.infer<typeof listTasksQuery>;
 
       return listTasks(userId, {
         status,
+        createdByTokenId,
+        agentCreated,
         limit,
         sortBy: 'priority',
         sortOrder: 'desc',
@@ -399,7 +407,7 @@ export async function mcpRoutes(fastify: FastifyInstance) {
       const userId = request.user!.userId;
       const body = request.body as z.infer<typeof createTaskBody>;
 
-      const task = await createTask(userId, body);
+      const task = await createTask(userId, body, request.apiTokenId);
       reply.code(201);
       return task;
     }
@@ -427,7 +435,7 @@ export async function mcpRoutes(fastify: FastifyInstance) {
       const { id } = request.params as { id: string };
       const body = request.body as z.infer<typeof updateTaskBody>;
 
-      return updateTask(id, userId, body);
+      return updateTask(id, userId, body, request.apiTokenId);
     }
   );
 
@@ -463,7 +471,7 @@ export async function mcpRoutes(fastify: FastifyInstance) {
       const userId = request.user!.userId;
       const body = request.body as z.infer<typeof createFolderBody>;
 
-      const folder = await createFolder(userId, body);
+      const folder = await createFolder(userId, body, request.apiTokenId);
       reply.code(201);
       return folder;
     }

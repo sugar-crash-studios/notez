@@ -27,6 +27,9 @@ import {
   changeUsernameSchema,
   RESERVED_USERNAMES,
   uuidParamSchema,
+  createAgentTokenSchema,
+  updateAgentTokenSchema,
+  AGENT_ICONS,
 } from './validation.schemas.js';
 
 // Helper: expect schema to parse successfully
@@ -670,6 +673,106 @@ describe('validation.schemas', () => {
       expectInvalid(changeUsernameSchema, { username: 'SYSTEM' });
       expectInvalid(changeUsernameSchema, { username: 'root' });
       expectInvalid(changeUsernameSchema, { username: 'notez' });
+    });
+  });
+
+  // ─── Agent Token Schemas ────────────────────────────────────────────
+  describe('createAgentTokenSchema', () => {
+    const validAgentToken = {
+      name: 'Claude Desktop',
+      scopes: ['read', 'write'],
+      agentName: 'Claude',
+      agentIcon: 'bot',
+      agentColor: '#8B5CF6',
+    };
+
+    it('should accept valid agent token data', () => {
+      expectValid(createAgentTokenSchema, validAgentToken);
+    });
+
+    it('should require agentName', () => {
+      expectInvalid(createAgentTokenSchema, { ...validAgentToken, agentName: undefined });
+    });
+
+    it('should reject empty agentName', () => {
+      expectInvalid(createAgentTokenSchema, { ...validAgentToken, agentName: '' });
+    });
+
+    it('should reject agentName over 50 chars', () => {
+      expectInvalid(createAgentTokenSchema, { ...validAgentToken, agentName: 'A'.repeat(51) });
+    });
+
+    it('should accept agentName with allowed characters', () => {
+      expectValid(createAgentTokenSchema, { ...validAgentToken, agentName: 'Claude 3.5 - Desktop' });
+      expectValid(createAgentTokenSchema, { ...validAgentToken, agentName: 'my_agent_v2' });
+    });
+
+    it('should reject agentName with special characters', () => {
+      expectInvalid(createAgentTokenSchema, { ...validAgentToken, agentName: '<script>alert(1)</script>' });
+      expectInvalid(createAgentTokenSchema, { ...validAgentToken, agentName: 'Claude & Friends' });
+      expectInvalid(createAgentTokenSchema, { ...validAgentToken, agentName: 'Agent "X"' });
+    });
+
+    it('should accept all valid agent icons', () => {
+      for (const icon of AGENT_ICONS) {
+        expectValid(createAgentTokenSchema, { ...validAgentToken, agentIcon: icon });
+      }
+    });
+
+    it('should reject invalid agent icon', () => {
+      expectInvalid(createAgentTokenSchema, { ...validAgentToken, agentIcon: 'invalid-icon' });
+    });
+
+    it('should accept valid hex colors', () => {
+      expectValid(createAgentTokenSchema, { ...validAgentToken, agentColor: '#000000' });
+      expectValid(createAgentTokenSchema, { ...validAgentToken, agentColor: '#FFFFFF' });
+      expectValid(createAgentTokenSchema, { ...validAgentToken, agentColor: '#abcdef' });
+    });
+
+    it('should reject invalid hex colors', () => {
+      expectInvalid(createAgentTokenSchema, { ...validAgentToken, agentColor: 'red' });
+      expectInvalid(createAgentTokenSchema, { ...validAgentToken, agentColor: '#fff' });
+      expectInvalid(createAgentTokenSchema, { ...validAgentToken, agentColor: '#GGGGGG' });
+      expectInvalid(createAgentTokenSchema, { ...validAgentToken, agentColor: '8B5CF6' });
+    });
+
+    it('should default agentIcon to bot and agentColor to #8B5CF6', () => {
+      const result = createAgentTokenSchema.parse({
+        name: 'Test',
+        scopes: ['read'],
+        agentName: 'Agent',
+      });
+      expect(result.agentIcon).toBe('bot');
+      expect(result.agentColor).toBe('#8B5CF6');
+    });
+
+    it('should deduplicate scopes', () => {
+      const result = createAgentTokenSchema.parse({
+        ...validAgentToken,
+        scopes: ['read', 'read'],
+      });
+      expect(result.scopes).toEqual(['read']);
+    });
+  });
+
+  describe('updateAgentTokenSchema', () => {
+    it('should accept partial updates', () => {
+      expectValid(updateAgentTokenSchema, { agentName: 'New Name' });
+      expectValid(updateAgentTokenSchema, { agentIcon: 'sparkles' });
+      expectValid(updateAgentTokenSchema, { agentColor: '#EC4899' });
+      expectValid(updateAgentTokenSchema, { name: 'New Token Name' });
+    });
+
+    it('should reject empty update (no fields)', () => {
+      expectInvalid(updateAgentTokenSchema, {});
+    });
+
+    it('should reject invalid icon in update', () => {
+      expectInvalid(updateAgentTokenSchema, { agentIcon: 'not-valid' });
+    });
+
+    it('should reject invalid color in update', () => {
+      expectInvalid(updateAgentTokenSchema, { agentColor: 'blue' });
     });
   });
 });

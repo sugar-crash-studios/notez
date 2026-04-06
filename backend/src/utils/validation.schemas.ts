@@ -350,6 +350,45 @@ export const createApiTokenSchema = z.object({
 
 export type CreateApiTokenInput = z.infer<typeof createApiTokenSchema>;
 
+// Agent icon options - curated Lucide icons for agent avatars
+export const AGENT_ICONS = [
+  'bot', 'cpu', 'brain', 'sparkles', 'wand-2', 'zap', 'cog', 'terminal',
+  'code', 'cloud', 'globe', 'rocket', 'shield', 'eye', 'star', 'hexagon',
+] as const;
+
+// Hex color regex: # followed by exactly 6 hex chars
+const hexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Must be a valid hex color (e.g. #8B5CF6)');
+
+// Agent name: letters, numbers, spaces, hyphens, underscores, periods
+const agentNameSchema = z.string()
+  .min(1, 'Agent name is required')
+  .max(50, 'Agent name must not exceed 50 characters')
+  .regex(/^[a-zA-Z0-9 _.\-]+$/, 'Agent name can only contain letters, numbers, spaces, hyphens, underscores, and periods');
+
+// Agent token schemas
+export const createAgentTokenSchema = z.object({
+  name: z.string().min(1, 'Token name is required').max(100, 'Token name must not exceed 100 characters'),
+  scopes: z.array(z.enum(['read', 'write'])).min(1, 'At least one scope is required').max(2)
+    .transform(arr => [...new Set(arr)]),
+  expiresIn: z.enum(['30d', '90d', '1y']).nullable().optional(),
+  agentName: agentNameSchema,
+  agentIcon: z.enum(AGENT_ICONS).default('bot'),
+  agentColor: hexColorSchema.default('#8B5CF6'),
+});
+
+export const updateAgentTokenSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  agentName: agentNameSchema.optional(),
+  agentIcon: z.enum(AGENT_ICONS).optional(),
+  agentColor: hexColorSchema.optional(),
+}).refine(
+  (data) => Object.values(data).some(v => v !== undefined),
+  { message: 'At least one field must be provided' }
+);
+
+export type CreateAgentTokenInput = z.infer<typeof createAgentTokenSchema>;
+export type UpdateAgentTokenInput = z.infer<typeof updateAgentTokenSchema>;
+
 // Share schemas
 export const createShareSchema = z.object({
   usernameOrEmail: z.string().min(1, 'Username or email is required').max(255),

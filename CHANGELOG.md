@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.21.0] - 2026-04-05
+
+### Added
+
+- **Agent accounts foundation** (EPIC-004): API tokens can now be designated as "agents" with display config (name, icon, color). Content created via agent tokens is automatically attributed.
+  - `ApiToken` model extended with `isAgent`, `agentName`, `agentIcon`, `agentColor` fields
+  - `createdByTokenId` nullable FK added to notes, folders, tags, and tasks for content attribution
+  - Auth middleware now passes `apiTokenId` through on API token requests
+  - MCP routes auto-stamp `createdByTokenId` on content creation and tag upserts (create + update paths)
+  - `POST /tokens/agents` - create an agent token with display config
+  - `GET /tokens/agents` - list agent tokens for the current user
+  - `PATCH /tokens/agents/:id` - update agent token display config (atomic, no TOCTOU)
+  - `agentCreated` boolean query filter on `GET /mcp/notes` and `GET /mcp/tasks` for easy filtering
+  - `createdByTokenId` UUID query filter for precise per-token filtering
+  - Agent name restricted to safe characters (alphanumeric, spaces, hyphens, underscores, periods)
+  - 16 curated Lucide agent icons, hex color validation
+  - Reversible migration (additive-only, no data changes)
+
+### Changed
+
+- Token creation logic refactored: shared `prepareTokenCreation()` and `resolveExpiry()` helpers eliminate duplication
+- `resolveExpiry()` now throws on unknown expiry values instead of silently defaulting to no expiry
+- `listApiTokens` response now includes agent fields (`isAgent`, `agentName`, `agentIcon`, `agentColor`)
+- Removed redundant `@@index([tokenHash])` (already covered by `@unique` constraint)
+
 ## [1.20.0] - 2026-04-05
 
 ### Added

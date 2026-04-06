@@ -132,6 +132,7 @@ export async function authenticateApiToken(
       role: result.role,
     };
     request.apiTokenScopes = result.scopes;
+    request.apiTokenId = result.tokenId;
   } catch {
     // Normalize all token validation failures to a single message
     // to prevent leaking token state (revoked, expired, inactive)
