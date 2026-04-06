@@ -128,10 +128,14 @@ export async function listNotes(
     if (agentCreated) {
       where.createdByToken = { isAgent: true };
     } else {
-      where.OR = [
-        { createdByTokenId: null },
-        { createdByToken: { isAgent: false } },
-      ];
+      // Use AND to avoid clobbering other OR clauses (e.g. search)
+      if (!where.AND) where.AND = [];
+      where.AND.push({
+        OR: [
+          { createdByTokenId: null },
+          { createdByToken: { isAgent: false } },
+        ],
+      });
     }
   }
 
@@ -146,10 +150,13 @@ export async function listNotes(
 
   // Search in title and content
   if (search) {
-    where.OR = [
-      { title: { contains: search, mode: 'insensitive' } },
-      { content: { contains: search, mode: 'insensitive' } },
-    ];
+    if (!where.AND) where.AND = [];
+    where.AND.push({
+      OR: [
+        { title: { contains: search, mode: 'insensitive' } },
+        { content: { contains: search, mode: 'insensitive' } },
+      ],
+    });
   }
 
   const [notes, total] = await Promise.all([

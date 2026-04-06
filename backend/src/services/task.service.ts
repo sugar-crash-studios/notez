@@ -166,10 +166,13 @@ export async function listTasks(
     if (agentCreated) {
       where.createdByToken = { isAgent: true };
     } else {
-      where.OR = [
-        { createdByTokenId: null },
-        { createdByToken: { isAgent: false } },
-      ];
+      if (!where.AND) where.AND = [];
+      where.AND.push({
+        OR: [
+          { createdByTokenId: null },
+          { createdByToken: { isAgent: false } },
+        ],
+      });
     }
   }
 

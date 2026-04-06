@@ -245,9 +245,13 @@ describe('note.service', () => {
       expect(mockPrisma.note.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            OR: [
-              { title: { contains: 'hello', mode: 'insensitive' } },
-              { content: { contains: 'hello', mode: 'insensitive' } },
+            AND: [
+              {
+                OR: [
+                  { title: { contains: 'hello', mode: 'insensitive' } },
+                  { content: { contains: 'hello', mode: 'insensitive' } },
+                ],
+              },
             ],
           }),
         })
