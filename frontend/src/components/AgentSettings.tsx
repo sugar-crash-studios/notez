@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, type KeyboardEvent } from 'react';
 import { agentTokensApi } from '../lib/api';
 import { useToast } from './Toast';
 import { useConfirm } from './ConfirmDialog';
@@ -54,6 +54,14 @@ const AGENT_ICON_MAP: Record<string, LucideIcon> = {
 };
 
 const AGENT_ICONS = Object.keys(AGENT_ICON_MAP);
+
+// Friendly labels for screen readers
+const AGENT_ICON_LABELS: Record<string, string> = {
+  'bot': 'Robot', 'cpu': 'CPU', 'brain': 'Brain', 'sparkles': 'Sparkles',
+  'wand-2': 'Wand', 'zap': 'Lightning', 'cog': 'Gear', 'terminal': 'Terminal',
+  'code': 'Code', 'cloud': 'Cloud', 'globe': 'Globe', 'rocket': 'Rocket',
+  'shield': 'Shield', 'eye': 'Eye', 'star': 'Star', 'hexagon': 'Hexagon',
+};
 
 // ─── Color presets ────────────────────────────────────────────────────────
 
@@ -124,29 +132,50 @@ function AgentIconPicker({
 }) {
   const [isOpen, setIsOpen] = useState(false);
 
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      setIsOpen(false);
+    }
+  };
+
   return (
     <div className="relative">
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-10 h-10 rounded-full flex items-center justify-center text-white transition-transform hover:scale-110"
-        style={{ backgroundColor: color }}
-        title="Select agent icon"
-      >
-        <AgentIcon icon={selectedIcon} className="w-5 h-5" />
-      </button>
+      <div className="flex flex-col items-center">
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-10 h-10 rounded-full flex items-center justify-center text-white transition-transform hover:scale-110"
+          style={{ backgroundColor: color }}
+          aria-label={`Icon: ${AGENT_ICON_LABELS[selectedIcon] || selectedIcon}. Click to change`}
+          aria-expanded={isOpen}
+          aria-haspopup="true"
+        >
+          <AgentIcon icon={selectedIcon} className="w-5 h-5" />
+        </button>
+        <span className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">Icon</span>
+      </div>
 
       {isOpen && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
-          <div className="absolute z-20 mt-1 left-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2 w-48">
+          {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+          <div
+            className="absolute z-20 mt-1 left-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2 w-48"
+            onKeyDown={handleKeyDown}
+            role="radiogroup"
+            aria-label="Agent icon"
+          >
             <div className="grid grid-cols-4 gap-1">
               {AGENT_ICONS.map((iconName) => {
                 const isSelected = iconName === selectedIcon;
+                const label = AGENT_ICON_LABELS[iconName] || iconName;
                 return (
                   <button
                     key={iconName}
                     type="button"
+                    role="radio"
+                    aria-checked={isSelected}
+                    aria-label={label}
                     onClick={() => {
                       onSelectIcon(iconName);
                       setIsOpen(false);
@@ -156,7 +185,6 @@ function AgentIconPicker({
                         ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400'
                         : 'text-gray-600 dark:text-gray-400'
                     }`}
-                    title={iconName}
                   >
                     <AgentIcon icon={iconName} className="w-5 h-5" />
                   </button>
@@ -180,26 +208,47 @@ function AgentColorPicker({
   onSelectColor: (color: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const selectedLabel = AGENT_COLORS.find((c) => c.value === selectedColor)?.label || 'Custom';
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      setIsOpen(false);
+    }
+  };
 
   return (
     <div className="relative">
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-8 h-8 rounded-full border-2 border-gray-300 dark:border-gray-600 transition-transform hover:scale-110"
-        style={{ backgroundColor: selectedColor }}
-        title="Select agent color"
-      />
+      <div className="flex flex-col items-center">
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-8 h-8 rounded-full border-2 border-gray-300 dark:border-gray-600 transition-transform hover:scale-110"
+          style={{ backgroundColor: selectedColor }}
+          aria-label={`Color: ${selectedLabel}. Click to change`}
+          aria-expanded={isOpen}
+          aria-haspopup="true"
+        />
+        <span className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">Color</span>
+      </div>
 
       {isOpen && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
-          <div className="absolute z-20 mt-1 left-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2 w-40">
+          {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+          <div
+            className="absolute z-20 mt-1 left-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2 w-40"
+            onKeyDown={handleKeyDown}
+            role="radiogroup"
+            aria-label="Agent color"
+          >
             <div className="grid grid-cols-4 gap-1.5">
               {AGENT_COLORS.map((c) => (
                 <button
                   key={c.value}
                   type="button"
+                  role="radio"
+                  aria-checked={c.value === selectedColor}
+                  aria-label={c.label}
                   onClick={() => {
                     onSelectColor(c.value);
                     setIsOpen(false);
@@ -208,7 +257,6 @@ function AgentColorPicker({
                     c.value === selectedColor ? 'ring-2 ring-offset-2 ring-blue-500 dark:ring-offset-gray-800' : ''
                   }`}
                   style={{ backgroundColor: c.value }}
-                  title={c.label}
                 />
               ))}
             </div>
@@ -336,7 +384,7 @@ export function AgentSettings() {
       await loadAgents();
       showToast('Agent created', 'success');
     } catch (err: any) {
-      showToast(err.response?.data?.message || 'Failed to create agent', 'error');
+      showToast(err.response?.data?.message || err.response?.data?.error || 'Failed to create agent', 'error');
     } finally {
       setIsCreating(false);
     }
@@ -365,7 +413,7 @@ export function AgentSettings() {
       await loadAgents();
       showToast('Agent updated', 'success');
     } catch (err: any) {
-      showToast(err.response?.data?.message || 'Failed to update agent', 'error');
+      showToast(err.response?.data?.message || err.response?.data?.error || 'Failed to update agent', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -387,7 +435,7 @@ export function AgentSettings() {
       await loadAgents();
       showToast('Agent revoked', 'success');
     } catch (err: any) {
-      showToast(err.response?.data?.message || 'Failed to revoke agent', 'error');
+      showToast(err.response?.data?.message || err.response?.data?.error || 'Failed to revoke agent', 'error');
     } finally {
       setRevokingId(null);
     }
@@ -809,6 +857,7 @@ function AgentEditRow({
 }) {
   return (
     <div className="border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/10 rounded-lg p-4 space-y-3">
+      <h4 className="sr-only">Editing agent: {editAgentName}</h4>
       <div className="flex items-start space-x-4">
         <div className="flex flex-col items-center space-y-2">
           <AgentIconPicker

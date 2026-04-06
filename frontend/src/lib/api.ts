@@ -551,6 +551,7 @@ export const agentTokensApi = {
     agentColor?: string;
   }) => api.patch(`/api/tokens/agents/${id}`, data),
 
+  // Uses generic token revoke endpoint (works for both regular and agent tokens)
   revoke: (id: string) => api.delete(`/api/tokens/${id}`),
 };
 
