@@ -102,11 +102,13 @@ export async function listNotes(
     folderId?: string | null;
     tagId?: string;
     search?: string;
+    createdByTokenId?: string;
+    agentCreated?: boolean;
     limit?: number;
     offset?: number;
   }
 ) {
-  const { folderId, tagId, search, limit = 50, offset = 0 } = options || {};
+  const { folderId, tagId, search, createdByTokenId, agentCreated, limit = 50, offset = 0 } = options || {};
 
   // Build where clause
   const where: any = { userId, deleted: false }; // Exclude deleted notes by default
@@ -114,6 +116,27 @@ export async function listNotes(
   // Filter by folder (null means unfiled notes)
   if (folderId !== undefined) {
     where.folderId = folderId;
+  }
+
+  // Filter by specific agent token
+  if (createdByTokenId) {
+    where.createdByTokenId = createdByTokenId;
+  }
+
+  // Filter by any agent-created content
+  if (agentCreated !== undefined) {
+    if (agentCreated) {
+      where.createdByToken = { isAgent: true };
+    } else {
+      // Use AND to avoid clobbering other OR clauses (e.g. search)
+      if (!where.AND) where.AND = [];
+      where.AND.push({
+        OR: [
+          { createdByTokenId: null },
+          { createdByToken: { isAgent: false } },
+        ],
+      });
+    }
   }
 
   // Filter by tag
@@ -127,10 +150,13 @@ export async function listNotes(
 
   // Search in title and content
   if (search) {
-    where.OR = [
-      { title: { contains: search, mode: 'insensitive' } },
-      { content: { contains: search, mode: 'insensitive' } },
-    ];
+    if (!where.AND) where.AND = [];
+    where.AND.push({
+      OR: [
+        { title: { contains: search, mode: 'insensitive' } },
+        { content: { contains: search, mode: 'insensitive' } },
+      ],
+    });
   }
 
   const [notes, total] = await Promise.all([
@@ -188,7 +214,7 @@ export async function listNotes(
 /**
  * Create a new note
  */
-export async function createNote(userId: string, data: CreateNoteInput) {
+export async function createNote(userId: string, data: CreateNoteInput, createdByTokenId?: string) {
   return prisma.$transaction(async (tx: any) => {
     // If folderId is provided, verify it belongs to the user
     if (data.folderId) {
@@ -211,7 +237,7 @@ export async function createNote(userId: string, data: CreateNoteInput) {
         tx.tag.upsert({
           where: { userId_name: { userId, name: tagName } },
           update: {},
-          create: { name: tagName, userId },
+          create: { name: tagName, userId, createdByTokenId: createdByTokenId || null },
         })
       );
 
@@ -228,6 +254,7 @@ export async function createNote(userId: string, data: CreateNoteInput) {
         content: data.content || null,
         userId,
         folderId: data.folderId || null,
+        createdByTokenId: createdByTokenId || null,
         tags: {
           create: tagConnections,
         },
@@ -271,7 +298,7 @@ export async function createNote(userId: string, data: CreateNoteInput) {
  * Update a note
  * Allows updates by owner or users with EDIT share permission
  */
-export async function updateNote(noteId: string, userId: string, data: UpdateNoteInput) {
+export async function updateNote(noteId: string, userId: string, data: UpdateNoteInput, createdByTokenId?: string) {
   return prisma.$transaction(async (tx: any) => {
     // Inline access check using the transaction's tx client to avoid TOCTOU race
     const note = await tx.note.findFirst({
@@ -337,7 +364,7 @@ export async function updateNote(noteId: string, userId: string, data: UpdateNot
           tx.tag.upsert({
             where: { userId_name: { userId: effectiveUserId, name: tagName } },
             update: {},
-            create: { name: tagName, userId: effectiveUserId },
+            create: { name: tagName, userId: effectiveUserId, createdByTokenId: createdByTokenId || null },
           })
         );
         const tags = await Promise.all(tagUpserts);

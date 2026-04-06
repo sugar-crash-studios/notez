@@ -110,13 +110,15 @@ export async function listTasks(
     noteId?: string;
     tagId?: string;
     overdue?: boolean;
+    createdByTokenId?: string;
+    agentCreated?: boolean;
     sortBy?: 'priority' | 'dueDate' | 'createdAt' | 'title';
     sortOrder?: 'asc' | 'desc';
     limit?: number;
     offset?: number;
   }
 ) {
-  const { status, priority, folderId, noteId, tagId, overdue, sortBy = 'priority', sortOrder = 'desc', limit = 50, offset = 0 } = options || {};
+  const { status, priority, folderId, noteId, tagId, overdue, createdByTokenId, agentCreated, sortBy = 'priority', sortOrder = 'desc', limit = 50, offset = 0 } = options || {};
 
   // Build where clause
   const where: any = { userId };
@@ -152,6 +154,26 @@ export async function listTasks(
         tagId,
       },
     };
+  }
+
+  // Filter by specific agent token
+  if (createdByTokenId) {
+    where.createdByTokenId = createdByTokenId;
+  }
+
+  // Filter by any agent-created content
+  if (agentCreated !== undefined) {
+    if (agentCreated) {
+      where.createdByToken = { isAgent: true };
+    } else {
+      if (!where.AND) where.AND = [];
+      where.AND.push({
+        OR: [
+          { createdByTokenId: null },
+          { createdByToken: { isAgent: false } },
+        ],
+      });
+    }
   }
 
   // Filter by overdue tasks
@@ -226,7 +248,7 @@ export async function listTasks(
 /**
  * Create a new task
  */
-export async function createTask(userId: string, data: CreateTaskInput) {
+export async function createTask(userId: string, data: CreateTaskInput, createdByTokenId?: string) {
   return prisma.$transaction(async (tx: any) => {
     // If folderId is provided, verify it belongs to the user
     if (data.folderId) {
@@ -266,7 +288,7 @@ export async function createTask(userId: string, data: CreateTaskInput) {
         tx.tag.upsert({
           where: { userId_name: { userId, name: tagName } },
           update: {},
-          create: { name: tagName, userId },
+          create: { name: tagName, userId, createdByTokenId: createdByTokenId || null },
         })
       );
 
@@ -297,6 +319,7 @@ export async function createTask(userId: string, data: CreateTaskInput) {
         noteId: data.noteId || null,
         noteTitle: noteTitle || null,
         folderId: data.folderId || null,
+        createdByTokenId: createdByTokenId || null,
         tags: {
           create: tagConnections,
         },
@@ -352,7 +375,7 @@ export async function createTask(userId: string, data: CreateTaskInput) {
 /**
  * Update a task
  */
-export async function updateTask(taskId: string, userId: string, data: UpdateTaskInput) {
+export async function updateTask(taskId: string, userId: string, data: UpdateTaskInput, createdByTokenId?: string) {
   return prisma.$transaction(async (tx: any) => {
     // Verify task exists and belongs to user
     const existingTask = await tx.task.findFirst({
@@ -414,7 +437,7 @@ export async function updateTask(taskId: string, userId: string, data: UpdateTas
           tx.tag.upsert({
             where: { userId_name: { userId, name: tagName } },
             update: {},
-            create: { name: tagName, userId },
+            create: { name: tagName, userId, createdByTokenId: createdByTokenId || null },
           })
         );
         const tags = await Promise.all(tagUpserts);

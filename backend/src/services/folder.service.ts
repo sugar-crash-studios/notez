@@ -57,7 +57,7 @@ export async function listFolders(userId: string) {
 /**
  * Create a new folder
  */
-export async function createFolder(userId: string, data: CreateFolderInput) {
+export async function createFolder(userId: string, data: CreateFolderInput, createdByTokenId?: string) {
   return prisma.$transaction(async (tx: any) => {
     // Check if folder with same name already exists for this user
     const existing = await tx.folder.findFirst({
@@ -77,6 +77,7 @@ export async function createFolder(userId: string, data: CreateFolderInput) {
         name: data.name,
         icon: data.icon || 'folder',
         userId,
+        createdByTokenId: createdByTokenId || null,
       },
       include: {
         _count: {

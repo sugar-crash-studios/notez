@@ -245,9 +245,13 @@ describe('note.service', () => {
       expect(mockPrisma.note.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            OR: [
-              { title: { contains: 'hello', mode: 'insensitive' } },
-              { content: { contains: 'hello', mode: 'insensitive' } },
+            AND: [
+              {
+                OR: [
+                  { title: { contains: 'hello', mode: 'insensitive' } },
+                  { content: { contains: 'hello', mode: 'insensitive' } },
+                ],
+              },
             ],
           }),
         })
@@ -264,6 +268,65 @@ describe('note.service', () => {
         expect.objectContaining({
           where: expect.objectContaining({ deleted: false }),
         })
+      );
+    });
+
+    it('should filter by createdByTokenId', async () => {
+      mockPrisma.note.findMany.mockResolvedValue([]);
+      mockPrisma.note.count.mockResolvedValue(0);
+
+      await listNotes('user-1', { createdByTokenId: 'token-abc' });
+
+      expect(mockPrisma.note.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            createdByTokenId: 'token-abc',
+          }),
+        })
+      );
+    });
+
+    it('should filter agentCreated=true via relation', async () => {
+      mockPrisma.note.findMany.mockResolvedValue([]);
+      mockPrisma.note.count.mockResolvedValue(0);
+
+      await listNotes('user-1', { agentCreated: true });
+
+      expect(mockPrisma.note.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            createdByToken: { isAgent: true },
+          }),
+        })
+      );
+    });
+
+    it('should filter agentCreated=false using AND to avoid clobbering search', async () => {
+      mockPrisma.note.findMany.mockResolvedValue([]);
+      mockPrisma.note.count.mockResolvedValue(0);
+
+      await listNotes('user-1', { agentCreated: false, search: 'hello' });
+
+      const call = mockPrisma.note.findMany.mock.calls[0][0];
+      // Both filters should be in AND array, not clobbering each other
+      expect(call.where.AND).toBeDefined();
+      expect(call.where.AND).toHaveLength(2);
+      // One AND entry is the agentCreated=false OR
+      expect(call.where.AND).toEqual(
+        expect.arrayContaining([
+          {
+            OR: [
+              { createdByTokenId: null },
+              { createdByToken: { isAgent: false } },
+            ],
+          },
+          {
+            OR: [
+              { title: { contains: 'hello', mode: 'insensitive' } },
+              { content: { contains: 'hello', mode: 'insensitive' } },
+            ],
+          },
+        ])
       );
     });
   });

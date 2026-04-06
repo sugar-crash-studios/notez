@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { authenticateToken, requireAdmin, optionalAuth } from './auth.middleware.js';
+import { authenticateToken, requireAdmin, optionalAuth, authenticateApiToken } from './auth.middleware.js';
 import { generateTokenPair } from '../utils/jwt.utils.js';
+
+// Mock token service for authenticateApiToken tests
+vi.mock('../services/token.service.js', () => ({
+  validateApiToken: vi.fn(),
+}));
+
+import { validateApiToken } from '../services/token.service.js';
+const mockValidateApiToken = vi.mocked(validateApiToken);
 
 // Helper to create mock Fastify request/reply
 function createMockRequest(overrides: Partial<any> = {}): any {
@@ -215,6 +223,69 @@ describe('auth.middleware', () => {
       await optionalAuth(request, reply);
 
       expect(request.user).toBeUndefined();
+    });
+  });
+
+  // ─── authenticateApiToken ────────────────────────────────────────────
+  describe('authenticateApiToken', () => {
+    it('should return 401 if no authorization header', async () => {
+      const request = createMockRequest();
+      const reply = createMockReply();
+
+      await authenticateApiToken(request, reply);
+
+      expect(reply.statusCode).toBe(401);
+    });
+
+    it('should return 401 for non-ntez_ tokens', async () => {
+      const request = createMockRequest({
+        headers: { authorization: 'Bearer not_a_ntez_token' },
+      });
+      const reply = createMockReply();
+
+      await authenticateApiToken(request, reply);
+
+      expect(reply.statusCode).toBe(401);
+      expect(reply.body.message).toBe('Invalid API token');
+    });
+
+    it('should set request.user, apiTokenScopes, and apiTokenId for valid token', async () => {
+      mockValidateApiToken.mockResolvedValue({
+        tokenId: 'token-abc',
+        userId: 'user-1',
+        username: 'testuser',
+        role: 'user',
+        scopes: ['read', 'write'],
+      });
+
+      const request = createMockRequest({
+        headers: { authorization: 'Bearer ntez_validtoken123456789012345678901234567890abc' },
+      });
+      const reply = createMockReply();
+
+      await authenticateApiToken(request, reply);
+
+      expect(request.user).toEqual({
+        userId: 'user-1',
+        username: 'testuser',
+        role: 'user',
+      });
+      expect(request.apiTokenScopes).toEqual(['read', 'write']);
+      expect(request.apiTokenId).toBe('token-abc');
+    });
+
+    it('should return 401 when token validation fails', async () => {
+      mockValidateApiToken.mockRejectedValue(new Error('Token has been revoked'));
+
+      const request = createMockRequest({
+        headers: { authorization: 'Bearer ntez_revokedtoken12345678901234567890123456789ab' },
+      });
+      const reply = createMockReply();
+
+      await authenticateApiToken(request, reply);
+
+      expect(reply.statusCode).toBe(401);
+      expect(reply.body.message).toBe('Invalid or expired API token');
     });
   });
 });

@@ -22,6 +22,9 @@ import {
   validateApiToken,
   listApiTokens,
   revokeApiToken,
+  createAgentToken,
+  listAgentTokens,
+  updateAgentToken,
 } from './token.service.js';
 import { prisma } from '../lib/db.js';
 import { NotFoundError, BadRequestError, AppError } from '../utils/errors.js';
@@ -178,6 +181,21 @@ describe('token.service', () => {
       const call = mockPrisma.apiToken.create.mock.calls[0][0];
       expect(call.data.expiresAt).toBeNull();
     });
+
+    it('should throw BadRequestError on unknown expiresIn value', async () => {
+      mockPrisma.apiToken.count.mockResolvedValue(0);
+
+      await expect(createApiToken('user-1', {
+        name: 'Bad Expiry',
+        scopes: ['read'],
+        expiresIn: '7d',
+      })).rejects.toThrow(BadRequestError);
+      await expect(createApiToken('user-1', {
+        name: 'Bad Expiry',
+        scopes: ['read'],
+        expiresIn: '7d',
+      })).rejects.toThrow('Unknown expiry value: 7d');
+    });
   });
 
   // ─── validateApiToken ───────────────────────────────────────────────
@@ -242,6 +260,7 @@ describe('token.service', () => {
       const result = await validateApiToken('ntez_validtoken1234567890');
 
       expect(result).toEqual({
+        tokenId: 'token-1',
         userId: 'user-1',
         username: 'testuser',
         role: 'admin',
@@ -344,6 +363,196 @@ describe('token.service', () => {
       await revokeApiToken('token-1', 'user-1');
 
       expect(mockPrisma.apiToken.findFirst).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── createAgentToken ───────────────────────────────────────────────
+  describe('createAgentToken', () => {
+    it('should create an agent token with display config', async () => {
+      mockPrisma.apiToken.count.mockResolvedValue(0);
+      mockPrisma.apiToken.create.mockResolvedValue({
+        id: 'agent-token-1',
+        name: 'Claude Desktop',
+        prefix: 'ntez_xxxx',
+        scopes: ['read', 'write'],
+        isAgent: true,
+        agentName: 'Claude',
+        agentIcon: 'bot',
+        agentColor: '#8B5CF6',
+        expiresAt: null,
+        createdAt: new Date(),
+      } as any);
+
+      const result = await createAgentToken('user-1', {
+        name: 'Claude Desktop',
+        scopes: ['read', 'write'],
+        agentName: 'Claude',
+        agentIcon: 'bot',
+        agentColor: '#8B5CF6',
+      });
+
+      expect(result.rawToken).toBeDefined();
+      expect(result.rawToken.startsWith('ntez_')).toBe(true);
+      expect(result.isAgent).toBe(true);
+      expect(result.agentName).toBe('Claude');
+      expect(result.agentIcon).toBe('bot');
+      expect(result.agentColor).toBe('#8B5CF6');
+
+      expect(mockPrisma.apiToken.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            userId: 'user-1',
+            isAgent: true,
+            agentName: 'Claude',
+            agentIcon: 'bot',
+            agentColor: '#8B5CF6',
+          }),
+        })
+      );
+    });
+
+    it('should enforce per-user token cap (shared with regular tokens)', async () => {
+      mockPrisma.apiToken.count.mockResolvedValue(20);
+
+      await expect(createAgentToken('user-1', {
+        name: 'Over Limit',
+        scopes: ['read'],
+        agentName: 'Agent',
+        agentIcon: 'bot',
+        agentColor: '#000000',
+      })).rejects.toThrow(AppError);
+    });
+
+    it('should set expiresAt for 90d expiry', async () => {
+      mockPrisma.apiToken.count.mockResolvedValue(0);
+      mockPrisma.apiToken.create.mockResolvedValue({
+        id: 'agent-token-2',
+        name: 'Expiring Agent',
+        prefix: 'ntez_xxxx',
+        scopes: ['read'],
+        isAgent: true,
+        agentName: 'Claude',
+        agentIcon: 'bot',
+        agentColor: '#8B5CF6',
+        expiresAt: new Date(),
+        createdAt: new Date(),
+        revokedAt: null,
+      } as any);
+
+      await createAgentToken('user-1', {
+        name: 'Expiring Agent',
+        scopes: ['read'],
+        expiresIn: '90d',
+        agentName: 'Claude',
+        agentIcon: 'bot',
+        agentColor: '#8B5CF6',
+      });
+
+      const call = mockPrisma.apiToken.create.mock.calls[0][0];
+      expect(call.data.expiresAt).toBeInstanceOf(Date);
+      const diff = (call.data.expiresAt as Date).getTime() - Date.now();
+      const ninetyDays = 90 * 24 * 60 * 60 * 1000;
+      expect(Math.abs(diff - ninetyDays)).toBeLessThan(5000);
+    });
+  });
+
+  // ─── listAgentTokens ───────────────────────────────────────────────
+  describe('listAgentTokens', () => {
+    it('should filter to agent tokens only', async () => {
+      const tokens = [
+        { id: 'agent-1', name: 'Claude', isAgent: true, agentName: 'Claude', agentIcon: 'bot', agentColor: '#8B5CF6' },
+      ];
+      mockPrisma.apiToken.findMany.mockResolvedValue(tokens as any);
+
+      const result = await listAgentTokens('user-1');
+
+      expect(mockPrisma.apiToken.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: 'user-1', isAgent: true },
+        })
+      );
+      expect(result).toHaveLength(1);
+      expect(result[0].isAgent).toBe(true);
+    });
+  });
+
+  // ─── updateAgentToken ──────────────────────────────────────────────
+  describe('updateAgentToken', () => {
+    it('should atomically update agent display config', async () => {
+      mockPrisma.apiToken.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.apiToken.findUnique.mockResolvedValue({
+        id: 'agent-1',
+        name: 'Claude Desktop',
+        agentName: 'Claude Updated',
+        agentIcon: 'sparkles',
+        agentColor: '#EC4899',
+      } as any);
+
+      const result = await updateAgentToken('agent-1', 'user-1', {
+        agentName: 'Claude Updated',
+        agentIcon: 'sparkles',
+        agentColor: '#EC4899',
+      });
+
+      expect(result!.agentName).toBe('Claude Updated');
+      expect(mockPrisma.apiToken.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'agent-1', userId: 'user-1', isAgent: true, revokedAt: null },
+          data: expect.objectContaining({
+            agentName: 'Claude Updated',
+            agentIcon: 'sparkles',
+            agentColor: '#EC4899',
+          }),
+        })
+      );
+    });
+
+    it('should not call findFirst when updateMany succeeds (no TOCTOU)', async () => {
+      mockPrisma.apiToken.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.apiToken.findUnique.mockResolvedValue({ id: 'agent-1' } as any);
+
+      await updateAgentToken('agent-1', 'user-1', { agentName: 'Test' });
+
+      expect(mockPrisma.apiToken.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('should reject updates to non-agent tokens', async () => {
+      mockPrisma.apiToken.updateMany.mockResolvedValue({ count: 0 });
+      mockPrisma.apiToken.findFirst.mockResolvedValue({
+        isAgent: false,
+        revokedAt: null,
+      } as any);
+
+      await expect(updateAgentToken('token-1', 'user-1', {
+        agentName: 'Hacker',
+      })).rejects.toThrow(BadRequestError);
+      await expect(updateAgentToken('token-1', 'user-1', {
+        agentName: 'Hacker',
+      })).rejects.toThrow('Token is not an agent token');
+    });
+
+    it('should reject updates to revoked tokens', async () => {
+      mockPrisma.apiToken.updateMany.mockResolvedValue({ count: 0 });
+      mockPrisma.apiToken.findFirst.mockResolvedValue({
+        isAgent: true,
+        revokedAt: new Date(),
+      } as any);
+
+      await expect(updateAgentToken('agent-1', 'user-1', {
+        agentName: 'Revived',
+      })).rejects.toThrow(BadRequestError);
+      await expect(updateAgentToken('agent-1', 'user-1', {
+        agentName: 'Revived',
+      })).rejects.toThrow('Cannot update a revoked token');
+    });
+
+    it('should throw NotFoundError when token not found', async () => {
+      mockPrisma.apiToken.updateMany.mockResolvedValue({ count: 0 });
+      mockPrisma.apiToken.findFirst.mockResolvedValue(null);
+
+      await expect(updateAgentToken('nonexistent', 'user-1', {
+        agentName: 'Ghost',
+      })).rejects.toThrow(NotFoundError);
     });
   });
 });

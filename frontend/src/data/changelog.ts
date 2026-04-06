@@ -12,6 +12,14 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '1.21.0',
+    date: '2026-04-05',
+    added: [
+      'Agent accounts foundation — API tokens can now be designated as agents with a custom name, icon, and color',
+      'Content created by agents is automatically attributed for future visibility features',
+    ],
+  },
+  {
     version: '1.20.0',
     date: '2026-04-05',
     added: [
