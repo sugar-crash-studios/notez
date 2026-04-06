@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.22.0] - 2026-04-06
+
+### Added
+
+- **My Agents settings UI** (EPIC-005): New "My Agents" section in Settings where users can create, edit, and revoke agent tokens with custom display config.
+  - Agent creation form with icon picker (16 curated icons), color picker (12 preset colors), name, scopes, and expiration
+  - Agent card list showing icon, name, token prefix, scopes, dates, and usage stats
+  - Inline editing of agent display config (name, icon, color)
+  - Token reveal flow with QR code, copy-to-clipboard, and 5-minute auto-clear
+  - Active/revoked sections matching existing API Tokens pattern
+  - Full dark mode support
+
 ## [1.21.0] - 2026-04-05
 
 ### Added

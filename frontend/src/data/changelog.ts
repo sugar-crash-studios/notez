@@ -12,6 +12,14 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '1.22.0',
+    date: '2026-04-06',
+    added: [
+      'My Agents — create named agent tokens with custom icons and colors from Settings',
+      'Edit agent display config (name, icon, color) anytime without revoking the token',
+    ],
+  },
+  {
     version: '1.21.0',
     date: '2026-04-05',
     added: [
