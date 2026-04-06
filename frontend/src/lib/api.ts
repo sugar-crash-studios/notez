@@ -532,6 +532,28 @@ export const tokensApi = {
   revoke: (id: string) => api.delete(`/api/tokens/${id}`),
 };
 
+export const agentTokensApi = {
+  list: () => api.get('/api/tokens/agents'),
+
+  create: (data: {
+    name: string;
+    scopes: string[];
+    expiresIn?: string | null;
+    agentName: string;
+    agentIcon: string;
+    agentColor: string;
+  }) => api.post('/api/tokens/agents', data),
+
+  update: (id: string, data: {
+    name?: string;
+    agentName?: string;
+    agentIcon?: string;
+    agentColor?: string;
+  }) => api.patch(`/api/tokens/agents/${id}`, data),
+
+  revoke: (id: string) => api.delete(`/api/tokens/${id}`),
+};
+
 export interface Webhook {
   id: string;
   url: string;

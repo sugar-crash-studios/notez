@@ -1,16 +1,17 @@
 import { useCallback } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { User, Bot, Shield, ArrowLeft, MessageSquare, Key, Webhook } from 'lucide-react';
+import { User, Bot, Shield, ArrowLeft, MessageSquare, Key, Webhook, Sparkles } from 'lucide-react';
 import { AppHeader } from '../components/AppHeader';
 import { ProfileSettings } from '../components/ProfileSettings';
 import { AISettings } from '../components/AISettings';
 import { AdminPanel } from '../components/AdminPanel';
 import { AdminFeedbackPanel } from '../components/AdminFeedbackPanel';
 import { ApiTokenSettings } from '../components/ApiTokenSettings';
+import { AgentSettings } from '../components/AgentSettings';
 import { WebhookSettings } from '../components/WebhookSettings';
 import { useAuth } from '../contexts/AuthContext';
 
-export type SettingsSection = 'profile' | 'ai' | 'tokens' | 'webhooks' | 'admin' | 'feedback';
+export type SettingsSection = 'profile' | 'ai' | 'agents' | 'tokens' | 'webhooks' | 'admin' | 'feedback';
 
 export const SECTION_CONFIG = {
   profile: {
@@ -23,6 +24,12 @@ export const SECTION_CONFIG = {
     label: 'AI Configuration',
     icon: Bot,
     description: 'Configure AI providers and models',
+    adminOnly: false,
+  },
+  agents: {
+    label: 'My Agents',
+    icon: Sparkles,
+    description: 'Manage agent tokens with custom names, icons, and colors',
     adminOnly: false,
   },
   tokens: {
@@ -82,6 +89,8 @@ export function SettingsHub() {
         return <ProfileSettings />;
       case 'ai':
         return <AISettings />;
+      case 'agents':
+        return <AgentSettings />;
       case 'tokens':
         return <ApiTokenSettings />;
       case 'webhooks':
