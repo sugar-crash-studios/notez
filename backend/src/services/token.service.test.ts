@@ -181,6 +181,21 @@ describe('token.service', () => {
       const call = mockPrisma.apiToken.create.mock.calls[0][0];
       expect(call.data.expiresAt).toBeNull();
     });
+
+    it('should throw BadRequestError on unknown expiresIn value', async () => {
+      mockPrisma.apiToken.count.mockResolvedValue(0);
+
+      await expect(createApiToken('user-1', {
+        name: 'Bad Expiry',
+        scopes: ['read'],
+        expiresIn: '7d',
+      })).rejects.toThrow(BadRequestError);
+      await expect(createApiToken('user-1', {
+        name: 'Bad Expiry',
+        scopes: ['read'],
+        expiresIn: '7d',
+      })).rejects.toThrow('Unknown expiry value: 7d');
+    });
   });
 
   // ─── validateApiToken ───────────────────────────────────────────────

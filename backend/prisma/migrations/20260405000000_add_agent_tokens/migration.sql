@@ -1,3 +1,6 @@
+-- Drop redundant index (tokenHash already has a unique constraint which creates an index)
+DROP INDEX IF EXISTS "api_tokens_token_hash_idx";
+
 -- Agent token fields on api_tokens
 ALTER TABLE "api_tokens" ADD COLUMN "is_agent" BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE "api_tokens" ADD COLUMN "agent_name" VARCHAR(50);
