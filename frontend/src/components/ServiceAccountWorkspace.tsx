@@ -294,8 +294,14 @@ export function ServiceAccountWorkspace({
               <div className="py-2">
                 {/* Folders Section */}
                 <button
-                  onClick={() => setFoldersCollapsed(!foldersCollapsed)}
-                  className="w-full px-3 py-1 flex items-center justify-between text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                  onClick={() => {
+                    const willCollapse = !foldersCollapsed;
+                    setFoldersCollapsed(willCollapse);
+                    if (willCollapse && selectedFolderId) {
+                      setSelectedFolderId(null);
+                    }
+                  }}
+                  className="w-full px-3 py-1 flex items-center justify-between text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                   aria-expanded={!foldersCollapsed}
                   id="folders-label"
                 >
@@ -365,8 +371,14 @@ export function ServiceAccountWorkspace({
                 {tags.length > 0 && (
                   <div className="mt-2">
                     <button
-                      onClick={() => setTagsCollapsed(!tagsCollapsed)}
-                      className="w-full px-3 py-1 flex items-center justify-between text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                      onClick={() => {
+                        const willCollapse = !tagsCollapsed;
+                        setTagsCollapsed(willCollapse);
+                        if (willCollapse && selectedTagId) {
+                          setSelectedTagId(null);
+                        }
+                      }}
+                      className="w-full px-3 py-1 flex items-center justify-between text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                       aria-expanded={!tagsCollapsed}
                       id="tags-label"
                     >

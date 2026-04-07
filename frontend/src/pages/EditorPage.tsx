@@ -24,6 +24,7 @@ const SIDEBAR_MIN = 180;
 const SIDEBAR_MAX = 400;
 const LIST_MIN = 240;
 const LIST_MAX = 500;
+const SA_WORKSPACE_WIDTH = 520; // Service account workspace: inner sidebar (224) + usable note list (~296)
 
 export function EditorPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -213,7 +214,7 @@ export function EditorPage() {
           className={`${mobileView === 'list' ? 'block' : 'hidden'} xl:block flex-shrink-0`}
           style={selectedFolderId === 'service-accounts'
             ? selectedServiceAccount
-              ? { width: Math.max(listWidth, 520), flex: '0 0 auto' }
+              ? { width: SA_WORKSPACE_WIDTH, flex: '0 0 auto' }
               : { width: '100%', flex: 1 }
             : { width: listWidth }}
         >
