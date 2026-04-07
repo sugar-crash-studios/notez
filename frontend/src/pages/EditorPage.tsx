@@ -211,8 +211,10 @@ export function EditorPage() {
         {/* Note List, Task List, or Service Account Views */}
         <div
           className={`${mobileView === 'list' ? 'block' : 'hidden'} xl:block flex-shrink-0`}
-          style={selectedFolderId === 'service-accounts' && !selectedServiceAccount
-            ? { width: '100%', flex: 1 }
+          style={selectedFolderId === 'service-accounts'
+            ? selectedServiceAccount
+              ? { width: Math.max(listWidth, 520), flex: '0 0 auto' }
+              : { width: '100%', flex: 1 }
             : { width: listWidth }}
         >
           {/* Service Account Dashboard (no account selected yet) */}

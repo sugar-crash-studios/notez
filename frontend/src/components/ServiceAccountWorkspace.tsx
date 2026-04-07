@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bot, ArrowLeft, FileText, Tag, Folder, Search, CheckSquare, FolderPlus, ChevronRight } from 'lucide-react';
+import { Bot, ArrowLeft, FileText, Tag, Folder, Search, CheckSquare, FolderPlus, ChevronRight, ChevronDown } from 'lucide-react';
 import { serviceAccountsApi } from '../lib/api';
 import { useToast } from './Toast';
 
@@ -149,6 +149,8 @@ export function ServiceAccountWorkspace({
 
   // Sidebar state
   const [isLoadingSidebar, setIsLoadingSidebar] = useState(true);
+  const [foldersCollapsed, setFoldersCollapsed] = useState(false);
+  const [tagsCollapsed, setTagsCollapsed] = useState(false);
 
   const NOTES_LIMIT = 50;
 
@@ -281,7 +283,7 @@ export function ServiceAccountWorkspace({
       {activeTab === 'content' ? (
         <div className="flex flex-1 min-h-0">
           {/* Sidebar: Folders + Tags */}
-          <div className="w-52 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-y-auto">
+          <div className="w-56 flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-y-auto">
             {isLoadingSidebar ? (
               <div className="p-3 space-y-2">
                 {[1, 2, 3].map((i) => (
@@ -291,87 +293,109 @@ export function ServiceAccountWorkspace({
             ) : (
               <div className="py-2">
                 {/* Folders Section */}
-                <div className="px-3 py-1 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider" id="folders-label">
-                  Folders
-                </div>
+                <button
+                  onClick={() => setFoldersCollapsed(!foldersCollapsed)}
+                  className="w-full px-3 py-1 flex items-center justify-between text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                  aria-expanded={!foldersCollapsed}
+                  id="folders-label"
+                >
+                  <span>Folders</span>
+                  {foldersCollapsed
+                    ? <ChevronRight className="w-3 h-3" />
+                    : <ChevronDown className="w-3 h-3" />
+                  }
+                </button>
 
-                <div role="listbox" aria-labelledby="folders-label">
-                  {/* All Notes */}
-                  <button
-                    role="option"
-                    aria-selected={!selectedFolderId && !selectedTagId}
-                    onClick={() => { setSelectedFolderId(null); setSelectedTagId(null); }}
-                    className={`w-full px-3 py-1.5 flex items-center gap-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
-                      !selectedFolderId && !selectedTagId ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-700 dark:text-gray-300'
-                    }`}
-                  >
-                    <FileText className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span className="truncate">All Notes</span>
-                    <span className="ml-auto text-xs text-gray-400">{totalNoteCount}</span>
-                  </button>
-
-                  {/* Individual folders */}
-                  {folders.map((folder) => (
-                    <button
-                      key={folder.id}
-                      role="option"
-                      aria-selected={selectedFolderId === folder.id}
-                      onClick={() => { setSelectedFolderId(folder.id); setSelectedTagId(null); }}
-                      className={`w-full px-3 py-1.5 flex items-center gap-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
-                        selectedFolderId === folder.id ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-700 dark:text-gray-300'
-                      }`}
-                    >
-                      <Folder className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span className="truncate">{folder.name}</span>
-                      <span className="ml-auto text-xs text-gray-400">{folder.noteCount}</span>
-                    </button>
-                  ))}
-
-                  {/* Unfiled */}
-                  {unfiledCount > 0 && (
+                {!foldersCollapsed && (
+                  <div role="listbox" aria-labelledby="folders-label">
+                    {/* All Notes */}
                     <button
                       role="option"
-                      aria-selected={selectedFolderId === 'unfiled'}
-                      onClick={() => { setSelectedFolderId('unfiled'); setSelectedTagId(null); }}
+                      aria-selected={!selectedFolderId && !selectedTagId}
+                      onClick={() => { setSelectedFolderId(null); setSelectedTagId(null); }}
                       className={`w-full px-3 py-1.5 flex items-center gap-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
-                        selectedFolderId === 'unfiled' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-500 dark:text-gray-400'
+                        !selectedFolderId && !selectedTagId ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-700 dark:text-gray-300'
                       }`}
                     >
                       <FileText className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span className="truncate">Unfiled</span>
-                      <span className="ml-auto text-xs text-gray-400">{unfiledCount}</span>
+                      <span className="truncate">All Notes</span>
+                      <span className="ml-auto text-xs text-gray-400">{totalNoteCount}</span>
                     </button>
-                  )}
-                </div>
 
-                {folders.length === 0 && unfiledCount === 0 && (
-                  <p className="px-3 py-2 text-xs text-gray-400 dark:text-gray-500">No folders</p>
+                    {/* Individual folders */}
+                    {folders.map((folder) => (
+                      <button
+                        key={folder.id}
+                        role="option"
+                        aria-selected={selectedFolderId === folder.id}
+                        onClick={() => { setSelectedFolderId(folder.id); setSelectedTagId(null); }}
+                        className={`w-full px-3 py-1.5 flex items-center gap-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
+                          selectedFolderId === folder.id ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-700 dark:text-gray-300'
+                        }`}
+                      >
+                        <Folder className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span className="truncate">{folder.name}</span>
+                        <span className="ml-auto text-xs text-gray-400">{folder.noteCount}</span>
+                      </button>
+                    ))}
+
+                    {/* Unfiled */}
+                    {unfiledCount > 0 && (
+                      <button
+                        role="option"
+                        aria-selected={selectedFolderId === 'unfiled'}
+                        onClick={() => { setSelectedFolderId('unfiled'); setSelectedTagId(null); }}
+                        className={`w-full px-3 py-1.5 flex items-center gap-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
+                          selectedFolderId === 'unfiled' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-500 dark:text-gray-400'
+                        }`}
+                      >
+                        <FileText className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span className="truncate">Unfiled</span>
+                        <span className="ml-auto text-xs text-gray-400">{unfiledCount}</span>
+                      </button>
+                    )}
+
+                    {folders.length === 0 && unfiledCount === 0 && (
+                      <p className="px-3 py-2 text-xs text-gray-400 dark:text-gray-500">No folders</p>
+                    )}
+                  </div>
                 )}
 
                 {/* Tags Section */}
                 {tags.length > 0 && (
-                  <>
-                    <div className="px-3 py-1 mt-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider" id="tags-label">
-                      Tags
-                    </div>
-                    <div role="listbox" aria-labelledby="tags-label">
-                      {tags.map((tag) => (
-                        <button
-                          key={tag.id}
-                          role="option"
-                          aria-selected={selectedTagId === tag.id}
-                          onClick={() => { setSelectedTagId(tag.id); setSelectedFolderId(null); }}
-                          className={`w-full px-3 py-1.5 flex items-center gap-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
-                            selectedTagId === tag.id ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-700 dark:text-gray-300'
-                          }`}
-                        >
-                          <Tag className="w-3.5 h-3.5 flex-shrink-0" />
-                          <span className="truncate">{tag.name}</span>
-                          <span className="ml-auto text-xs text-gray-400">{tag.usageCount}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </>
+                  <div className="mt-2">
+                    <button
+                      onClick={() => setTagsCollapsed(!tagsCollapsed)}
+                      className="w-full px-3 py-1 flex items-center justify-between text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                      aria-expanded={!tagsCollapsed}
+                      id="tags-label"
+                    >
+                      <span>Tags</span>
+                      {tagsCollapsed
+                        ? <ChevronRight className="w-3 h-3" />
+                        : <ChevronDown className="w-3 h-3" />
+                      }
+                    </button>
+                    {!tagsCollapsed && (
+                      <div role="listbox" aria-labelledby="tags-label">
+                        {tags.map((tag) => (
+                          <button
+                            key={tag.id}
+                            role="option"
+                            aria-selected={selectedTagId === tag.id}
+                            onClick={() => { setSelectedTagId(tag.id); setSelectedFolderId(null); }}
+                            className={`w-full px-3 py-1.5 flex items-center gap-2 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
+                              selectedTagId === tag.id ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-700 dark:text-gray-300'
+                            }`}
+                          >
+                            <Tag className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span className="truncate">{tag.name}</span>
+                            <span className="ml-auto text-xs text-gray-400">{tag.usageCount}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {/* Stats */}
