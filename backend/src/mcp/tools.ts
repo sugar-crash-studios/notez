@@ -1,23 +1,30 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { prisma } from '../lib/db.js';
 import { searchService } from '../services/search.service.js';
 import { getNoteById, getNoteByTitle, listNotes, createNote, updateNote, deleteNote, restoreNote } from '../services/note.service.js';
 import { getTaskById, listTasks, createTask, updateTask, deleteTask } from '../services/task.service.js';
 import { listFolders, createFolder, updateFolder, deleteFolder } from '../services/folder.service.js';
 import { listTags, renameTag, deleteTag } from '../services/tag.service.js';
 import { shareNote, listSharesForNote, unshareNote, updateSharePermission } from '../services/share.service.js';
+import { FOLDER_ICONS } from '../utils/validation.schemas.js';
+import { htmlToPlainText } from '../utils/html.js';
 
 /**
- * Strip HTML tags, decode entities, and collapse whitespace for AI consumption.
- * Reuses the same logic from mcp.routes.ts.
+ * Escape delimiter strings from content to prevent prompt injection via delimiter breakout.
+ * Handles ASCII angle brackets, fullwidth Unicode lookalikes (U+FF1C/FF1E), and HTML entities.
  */
-function htmlToPlainText(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
-    .replace(/\s+/g, ' ')
-    .trim();
+function escapeDelimiters(text: string): string {
+  return text
+    // ASCII angle bracket delimiters
+    .replace(/<\/?notez_result>/gi, '[notez-data-boundary]')
+    .replace(/<\/?notez_error>/gi, '[notez-error-boundary]')
+    // Fullwidth Unicode lookalikes (U+FF1C = ＜, U+FF1E = ＞, U+FF0F = ／)
+    .replace(/[\uff1c][\uff0f\/]?notez_result[\uff1e]/gi, '[notez-data-boundary]')
+    .replace(/[\uff1c][\uff0f\/]?notez_error[\uff1e]/gi, '[notez-error-boundary]')
+    // HTML entity-encoded angle brackets
+    .replace(/&lt;\/?notez_result&gt;/gi, '[notez-data-boundary]')
+    .replace(/&lt;\/?notez_error&gt;/gi, '[notez-error-boundary]');
 }
 
 /**
@@ -25,7 +32,8 @@ function htmlToPlainText(html: string): string {
  * Mitigates prompt injection via note/task content (Slag CHAIN-4).
  */
 function wrapToolResponse(data: unknown): string {
-  return `<notez_result>\n${JSON.stringify(data, null, 2)}\n</notez_result>`;
+  const serialized = escapeDelimiters(JSON.stringify(data, null, 2));
+  return `<notez_result>\n${serialized}\n</notez_result>`;
 }
 
 function toolResult(data: unknown, isError = false) {
@@ -37,8 +45,9 @@ function toolResult(data: unknown, isError = false) {
 
 function toolError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
+  const safeMessage = escapeDelimiters(message);
   return {
-    content: [{ type: 'text' as const, text: `<notez_error>${message}</notez_error>` }],
+    content: [{ type: 'text' as const, text: `<notez_error>${safeMessage}</notez_error>` }],
     isError: true,
   };
 }
@@ -50,10 +59,19 @@ interface ToolDef {
   register: (server: McpServer, getUserId: () => string) => void;
 }
 
-const toolDefs: ToolDef[] = [];
+// Build tool definitions lazily on first use and cache (avoids test reload issues with module-level mutation)
+let _toolDefs: ToolDef[] | null = null;
+const _pendingDefs: ToolDef[] = [];
 
 function defineTool(scope: Scope, register: (server: McpServer, getUserId: () => string) => void) {
-  toolDefs.push({ scope, register });
+  _pendingDefs.push({ scope, register });
+}
+
+function getToolDefs(): ToolDef[] {
+  if (!_toolDefs) {
+    _toolDefs = [..._pendingDefs];
+  }
+  return _toolDefs;
 }
 
 // ─── Notes (read) ──────────────────────────────────────────────────
@@ -149,25 +167,8 @@ defineTool('mcp:read', (server, getUserId) => {
   );
 });
 
-defineTool('mcp:read', (server, getUserId) => {
-  server.registerTool(
-    'notez_list_recent_notes',
-    {
-      description: 'List recently modified notes, sorted by last update time.',
-      inputSchema: {
-        limit: z.number().min(1).max(50).default(20).describe('Max notes to return'),
-      },
-    },
-    async ({ limit }) => {
-      try {
-        const result = await listNotes(getUserId(), { limit, offset: 0 });
-        return toolResult(result);
-      } catch (error) {
-        return toolError(error);
-      }
-    }
-  );
-});
+// notez_list_recent_notes removed: notez_list_notes already returns notes sorted by updatedAt desc
+// and accepts the same limit parameter. Having both wastes tool window space for the AI.
 
 // ─── Notes (write) ──────────────────────────────────────────────────
 
@@ -261,18 +262,26 @@ defineTool('mcp:write', (server, getUserId) => {
       description: 'Append content to an existing note. Content is added to the end.',
       inputSchema: {
         id: z.string().uuid().describe('Note UUID'),
-        content: z.string().describe('Content to append (HTML)'),
+        content: z.string().max(100_000).describe('Content to append (HTML)'),
       },
     },
     async ({ id, content }) => {
       try {
-        const note = await getNoteById(id, getUserId());
-        const existingContent = note.content || '';
-        const newContent = existingContent + content;
-        if (newContent.length > 500_000) {
-          return toolError(new Error('Note content would exceed maximum size (500KB)'));
+        // Verify user has access (throws if not found or unauthorized)
+        await getNoteById(id, getUserId());
+        // Atomic append with size guard via raw SQL (avoids TOCTOU race from read-modify-write).
+        // note.service.ts does not sanitize HTML content (TipTap handles that client-side),
+        // so bypassing the service layer here is safe. Webhook events are not emitted for
+        // MCP-initiated appends (acceptable: MCP tools are the integration layer).
+        const result = await prisma.$executeRaw`
+          UPDATE notes SET content = COALESCE(content, '') || ${content}, updated_at = NOW()
+          WHERE id = ${id} AND user_id = ${getUserId()}
+          AND LENGTH(COALESCE(content, '') || ${content}) <= 500000
+        `;
+        if (result === 0) {
+          return toolError(new Error('Note content would exceed maximum size (500KB) or note not found'));
         }
-        const updated = await updateNote(id, getUserId(), { content: newContent });
+        const updated = await getNoteById(id, getUserId());
         return toolResult(updated);
       } catch (error) {
         return toolError(error);
@@ -422,12 +431,12 @@ defineTool('mcp:write', (server, getUserId) => {
       description: 'Create a new folder.',
       inputSchema: {
         name: z.string().max(255).describe('Folder name'),
-        icon: z.string().optional().describe('Lucide icon name (default: folder)'),
+        icon: z.enum(FOLDER_ICONS).optional().describe('Lucide icon name (default: folder)'),
       },
     },
     async ({ name, icon }) => {
       try {
-        const folder = await createFolder(getUserId(), { name, icon: icon as any });
+        const folder = await createFolder(getUserId(), { name, icon });
         return toolResult(folder);
       } catch (error) {
         return toolError(error);
@@ -444,12 +453,12 @@ defineTool('mcp:write', (server, getUserId) => {
       inputSchema: {
         id: z.string().uuid().describe('Folder UUID'),
         name: z.string().max(255).optional().describe('New folder name'),
-        icon: z.string().optional().describe('New icon name'),
+        icon: z.enum(FOLDER_ICONS).optional().describe('New icon name'),
       },
     },
     async ({ id, name, icon }) => {
       try {
-        const folder = await updateFolder(id, getUserId(), { name, icon: icon as any });
+        const folder = await updateFolder(id, getUserId(), { name, icon });
         return toolResult(folder);
       } catch (error) {
         return toolError(error);
@@ -629,7 +638,7 @@ export function registerNotezTools(
   getUserId: () => string,
   allowedScopes: Scope[]
 ): void {
-  for (const tool of toolDefs) {
+  for (const tool of getToolDefs()) {
     if (allowedScopes.includes(tool.scope)) {
       tool.register(server, getUserId);
     }

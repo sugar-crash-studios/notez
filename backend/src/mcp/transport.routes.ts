@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { IncomingMessage } from 'node:http';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
@@ -10,10 +10,26 @@ import { verifyAccessToken, OAuthError } from './oauth.service.js';
 import { registerNotezTools } from './tools.js';
 
 // Configurable origin allowlist (Slag CHAIN-3 mitigation)
-const ALLOWED_ORIGINS = (process.env.MCP_ALLOWED_ORIGINS || 'https://claude.ai,https://www.claude.ai')
+// Parse hostnames at startup to fail fast on misconfiguration and avoid per-request URL parsing
+const RAW_ALLOWED_ORIGINS = (process.env.MCP_ALLOWED_ORIGINS || 'https://claude.ai,https://www.claude.ai')
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean);
+
+const ALLOWED_ORIGIN_HOSTNAMES: string[] = [];
+for (const origin of RAW_ALLOWED_ORIGINS) {
+  try {
+    ALLOWED_ORIGIN_HOSTNAMES.push(new URL(origin).hostname);
+  } catch {
+    throw new Error(`Invalid URL in MCP_ALLOWED_ORIGINS: ${origin}`);
+  }
+}
+
+function isOriginAllowed(origin: string): boolean {
+  // Exact match only against configured origins (no subdomain wildcards)
+  // Aligned with redirect URI policy in oauth.service.ts
+  return RAW_ALLOWED_ORIGINS.includes(origin);
+}
 
 const sessionManager = new McpSessionManager();
 
@@ -33,15 +49,15 @@ export async function mcpTransportRoutes(fastify: FastifyInstance) {
   // Origin validation hook for all /mcp routes
   fastify.addHook('preHandler', async (request: FastifyRequest, reply: FastifyReply) => {
     const origin = request.headers.origin;
-    if (origin && !ALLOWED_ORIGINS.some((allowed) => origin === allowed || origin.endsWith(`.${new URL(allowed).hostname}`))) {
+    if (origin && !isOriginAllowed(origin)) {
       return reply.code(403).send({ error: 'Forbidden', message: 'Origin not allowed' });
     }
   });
 
-  // CORS for /mcp
+  // CORS for /mcp - uses same origin check as preHandler
   fastify.addHook('onSend', async (request, reply) => {
     const origin = request.headers.origin;
-    if (origin && ALLOWED_ORIGINS.some((allowed) => origin === allowed)) {
+    if (origin && isOriginAllowed(origin)) {
       reply.header('Access-Control-Allow-Origin', origin);
       reply.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Mcp-Session-Id, Last-Event-ID');
       reply.header('Access-Control-Expose-Headers', 'Mcp-Session-Id');
@@ -80,14 +96,15 @@ export async function mcpTransportRoutes(fastify: FastifyInstance) {
     }
   }
 
-  // Rate limit for MCP transport
+  // Rate limit for MCP transport (key on hashed token + IP)
   const mcpRateLimit = {
     rateLimit: {
       max: 60,
       timeWindow: '1 minute',
       keyGenerator: (request: FastifyRequest) => {
         const auth = request.headers.authorization || '';
-        return `mcp-transport:${auth.substring(0, 20)}:${request.ip}`;
+        const tokenHash = createHash('sha256').update(auth).digest('hex').substring(0, 16);
+        return `mcp-transport:${tokenHash}:${request.ip}`;
       },
     },
   };
@@ -120,6 +137,14 @@ export async function mcpTransportRoutes(fastify: FastifyInstance) {
       if (!sessionId && isInitializeRequest(request.body as Record<string, unknown>)) {
         // New session
         const userId = authInfo.extra?.userId as string;
+        if (typeof userId !== 'string') {
+          return reply.code(403).send({
+            jsonrpc: '2.0',
+            error: { code: -32000, message: 'Invalid token: missing user ID' },
+            id: null,
+          });
+        }
+
         const check = sessionManager.canCreateSession(userId);
         if (!check.allowed) {
           return reply.code(429).send({
@@ -128,6 +153,18 @@ export async function mcpTransportRoutes(fastify: FastifyInstance) {
             id: null,
           });
         }
+
+        // Create server first to avoid TDZ reference in transport callback
+        const server = new McpServer({
+          name: 'notez',
+          version: '1.23.0',
+        });
+
+        // Register tools based on granted scopes (v1.23: read-only)
+        const allowedScopes = authInfo.scopes.filter(
+          (s): s is 'mcp:read' | 'mcp:write' => s === 'mcp:read' || s === 'mcp:write'
+        );
+        registerNotezTools(server, () => userId, allowedScopes);
 
         const transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => randomUUID(),
@@ -147,18 +184,6 @@ export async function mcpTransportRoutes(fastify: FastifyInstance) {
           const sid = transport.sessionId;
           if (sid) sessionManager.removeSession(sid);
         };
-
-        // Create a per-session MCP server with tools scoped to this user
-        const server = new McpServer({
-          name: 'notez',
-          version: '1.23.0',
-        });
-
-        // Register tools based on granted scopes (v1.18: read-only)
-        const allowedScopes = authInfo.scopes.filter(
-          (s): s is 'mcp:read' | 'mcp:write' => s === 'mcp:read' || s === 'mcp:write'
-        );
-        registerNotezTools(server, () => userId, allowedScopes);
 
         await server.connect(transport);
 
@@ -209,7 +234,7 @@ export async function mcpTransportRoutes(fastify: FastifyInstance) {
   });
 
   // DELETE /mcp - Session termination
-  fastify.delete('/mcp', async (request: FastifyRequest, reply: FastifyReply) => {
+  fastify.delete('/mcp', { config: mcpRateLimit }, async (request: FastifyRequest, reply: FastifyReply) => {
     const authInfo = await authenticateMcpToken(request, reply);
     if (!authInfo) return;
 
@@ -231,11 +256,15 @@ export async function mcpTransportRoutes(fastify: FastifyInstance) {
     await session.transport.handleRequest(request.raw, reply.raw);
   });
 
-  // Health check for MCP subsystem
-  fastify.get('/mcp/health', async () => {
+  // Health check for MCP subsystem (basic status is public, session count requires auth)
+  fastify.get('/mcp/health', async (request) => {
+    const authHeader = request.headers.authorization;
+    const authInfo = authHeader?.startsWith('Bearer ')
+      ? await verifyAccessToken(authHeader.substring(7)).catch(() => null)
+      : null;
     return {
       status: 'ok',
-      activeSessions: sessionManager.getSessionCount(),
+      ...(authInfo ? { activeSessions: sessionManager.getSessionCount() } : {}),
     };
   });
 }

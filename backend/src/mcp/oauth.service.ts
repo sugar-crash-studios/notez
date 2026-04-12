@@ -3,18 +3,40 @@ import bcrypt from 'bcrypt';
 import { prisma } from '../lib/db.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 
+// Dummy hash for constant-time rejection when client not found
+const DUMMY_HASH = '$2b$10$dummyhashfortimingoracle000000000000000000000000';
+
+/**
+ * Structured security event logger for OAuth.
+ * Outputs JSON for easy ingestion by log aggregators.
+ */
+function logSecurityEvent(event: string, details: Record<string, unknown>): void {
+  console.log(JSON.stringify({
+    type: 'oauth_security_event',
+    event,
+    timestamp: new Date().toISOString(),
+    ...details,
+  }));
+}
+
 // Token TTLs
 const ACCESS_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const AUTH_CODE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const CONSENT_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-// Redirect URI allowlist for known Claude connector domains
-const ALLOWED_REDIRECT_DOMAINS = [
+// Redirect URI allowlist for known Claude connector domains.
+// Exact domains only. No broad subdomain wildcards to prevent subdomain takeover amplification.
+const ALLOWED_REDIRECT_EXACT_DOMAINS = [
   'claude.ai',
   'www.claude.ai',
   'anthropic.com',
   'www.anthropic.com',
+];
+
+// Pinned subdomain patterns (e.g. app.claude.ai) - only add when a specific subdomain is confirmed needed
+const ALLOWED_REDIRECT_SUBDOMAIN_PARENTS: string[] = [
+  // 'claude.ai' would allow *.claude.ai - intentionally empty until specific subdomains are confirmed
 ];
 
 function sha256(input: string): string {
@@ -27,7 +49,8 @@ function generateToken(): string {
 
 /**
  * Validate that a redirect URI domain is in the allowlist.
- * Also blocks private IPs (SSRF prevention).
+ * Blocks non-HTTPS, user/password in URI, and non-allowlisted domains.
+ * Subdomain wildcards are intentionally not enabled by default.
  */
 export function validateRedirectUri(uri: string): boolean {
   let parsed: URL;
@@ -37,7 +60,7 @@ export function validateRedirectUri(uri: string): boolean {
     return false;
   }
 
-  // Must be HTTPS
+  // Must be HTTPS (also blocks javascript:, data:, etc.)
   if (parsed.protocol !== 'https:') {
     return false;
   }
@@ -47,12 +70,16 @@ export function validateRedirectUri(uri: string): boolean {
     return false;
   }
 
-  // Check domain against allowlist
   const hostname = parsed.hostname.toLowerCase();
 
-  // Allow subdomains of allowed domains
-  return ALLOWED_REDIRECT_DOMAINS.some(
-    (allowed) => hostname === allowed || hostname.endsWith(`.${allowed}`)
+  // Exact domain match
+  if (ALLOWED_REDIRECT_EXACT_DOMAINS.includes(hostname)) {
+    return true;
+  }
+
+  // Pinned subdomain match (only if explicitly configured)
+  return ALLOWED_REDIRECT_SUBDOMAIN_PARENTS.some(
+    (parent) => hostname.endsWith(`.${parent}`)
   );
 }
 
@@ -81,6 +108,8 @@ export interface RegisterClientResult {
   tokenEndpointAuthMethod: string;
 }
 
+const MAX_PENDING_CLIENTS = 20;
+
 export async function registerClient(input: RegisterClientInput): Promise<RegisterClientResult> {
   // Validate all redirect URIs
   for (const uri of input.redirectUris) {
@@ -91,6 +120,12 @@ export async function registerClient(input: RegisterClientInput): Promise<Regist
 
   if (!input.redirectUris.length) {
     throw new OAuthError('invalid_client_metadata', 'At least one redirect_uri is required');
+  }
+
+  // Cap pending registrations to prevent admin queue spam
+  const pendingCount = await prisma.oAuthClient.count({ where: { status: 'pending_approval' } });
+  if (pendingCount >= MAX_PENDING_CLIENTS) {
+    throw new OAuthError('invalid_client_metadata', 'Too many pending registrations. Try again later.');
   }
 
   const clientId = `notez_${randomBytes(16).toString('hex')}`;
@@ -142,20 +177,17 @@ export async function validateClientCredentials(
 ): Promise<{ id: string; clientId: string; scope: string | null; redirectUris: string[] }> {
   const client = await prisma.oAuthClient.findUnique({ where: { clientId } });
 
-  if (!client) {
-    throw new OAuthError('invalid_client', 'Unknown client');
-  }
+  // Always run bcrypt compare to prevent timing side-channel enumeration
+  const hashToCompare = client?.clientSecretHash || DUMMY_HASH;
+  const valid = await bcrypt.compare(clientSecret, hashToCompare);
 
-  if (client.status !== 'approved') {
-    throw new OAuthError('invalid_client', 'Client not approved');
+  if (!client || client.status !== 'approved' || !valid) {
+    logSecurityEvent('client_auth_failure', { clientId, reason: !client ? 'unknown_client' : !valid ? 'bad_secret' : 'not_approved' });
+    throw new OAuthError('invalid_client', 'Invalid client credentials');
   }
 
   if (client.clientSecretExpiresAt && client.clientSecretExpiresAt < new Date()) {
-    throw new OAuthError('invalid_client', 'Client secret expired');
-  }
-
-  const valid = await bcrypt.compare(clientSecret, client.clientSecretHash);
-  if (!valid) {
+    logSecurityEvent('client_auth_failure', { clientId, reason: 'secret_expired' });
     throw new OAuthError('invalid_client', 'Invalid client credentials');
   }
 
@@ -201,6 +233,31 @@ export async function exchangeAuthorizationCode(
 ): Promise<{ accessToken: string; refreshToken: string; expiresIn: number; scope: string }> {
   const codeHash = sha256(code);
 
+  // Atomically mark code as used (prevents TOCTOU race on concurrent requests)
+  const markResult = await prisma.oAuthAuthorizationCode.updateMany({
+    where: { codeHash, usedAt: null },
+    data: { usedAt: new Date() },
+  });
+
+  if (markResult.count === 0) {
+    // Either code doesn't exist, or it was already used (replay)
+    const existingCode = await prisma.oAuthAuthorizationCode.findUnique({
+      where: { codeHash },
+    });
+
+    if (existingCode?.usedAt) {
+      // Code reuse detected. Revoke all tokens for this grant.
+      logSecurityEvent('auth_code_replay', { clientId: existingCode.clientId, userId: existingCode.userId });
+      await prisma.oAuthAccessToken.updateMany({
+        where: { clientId: existingCode.clientId, userId: existingCode.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    }
+
+    throw new OAuthError('invalid_grant', 'Invalid authorization code');
+  }
+
+  // Code was atomically claimed. Now fetch full details for validation.
   const authCode = await prisma.oAuthAuthorizationCode.findUnique({
     where: { codeHash },
   });
@@ -213,15 +270,6 @@ export async function exchangeAuthorizationCode(
     throw new OAuthError('invalid_grant', 'Code was not issued to this client');
   }
 
-  if (authCode.usedAt) {
-    // Code reuse detected. Per security best practices, revoke all tokens for this grant.
-    await prisma.oAuthAccessToken.updateMany({
-      where: { clientId: clientInternalId, userId: authCode.userId, revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
-    throw new OAuthError('invalid_grant', 'Authorization code already used');
-  }
-
   if (authCode.expiresAt < new Date()) {
     throw new OAuthError('invalid_grant', 'Authorization code expired');
   }
@@ -230,7 +278,11 @@ export async function exchangeAuthorizationCode(
     throw new OAuthError('invalid_grant', 'Redirect URI mismatch');
   }
 
-  // PKCE verification
+  // PKCE verification (S256 only)
+  if (authCode.codeChallengeMethod !== 'S256') {
+    throw new OAuthError('invalid_grant', 'Only S256 PKCE method is supported');
+  }
+
   const expectedChallenge = createHash('sha256')
     .update(codeVerifier)
     .digest('base64url');
@@ -238,12 +290,6 @@ export async function exchangeAuthorizationCode(
   if (expectedChallenge !== authCode.codeChallenge) {
     throw new OAuthError('invalid_grant', 'PKCE verification failed');
   }
-
-  // Mark code as used
-  await prisma.oAuthAuthorizationCode.update({
-    where: { id: authCode.id },
-    data: { usedAt: new Date() },
-  });
 
   // Generate tokens
   return issueTokens(clientInternalId, authCode.userId, authCode.scope);
@@ -306,6 +352,7 @@ export async function exchangeRefreshToken(
 
   if (token.refreshRotatedAt) {
     // Replay attack detected! Revoke entire token family for this client+user.
+    logSecurityEvent('refresh_token_replay', { clientId: clientInternalId, userId: token.userId, tokenId: token.id });
     await prisma.oAuthAccessToken.updateMany({
       where: { clientId: clientInternalId, userId: token.userId, revokedAt: null },
       data: { revokedAt: new Date() },
@@ -325,13 +372,44 @@ export async function exchangeRefreshToken(
     throw new OAuthError('invalid_scope', 'Cannot escalate scope via refresh');
   }
 
-  // Rotate: mark old refresh token as rotated, issue new tokens
-  await prisma.oAuthAccessToken.update({
-    where: { id: token.id },
+  // Atomically claim the refresh token (prevents concurrent rotation issuing two successors)
+  const claimResult = await prisma.oAuthAccessToken.updateMany({
+    where: { id: token.id, refreshRotatedAt: null },
     data: { refreshRotatedAt: new Date() },
   });
 
-  return issueTokens(clientInternalId, token.userId, scope);
+  if (claimResult.count === 0) {
+    // Token was concurrently rotated by another request - treat as replay
+    logSecurityEvent('refresh_token_concurrent_rotation', { clientId: clientInternalId, userId: token.userId, tokenId: token.id });
+    await prisma.oAuthAccessToken.updateMany({
+      where: { clientId: clientInternalId, userId: token.userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    throw new OAuthError('invalid_grant', 'Refresh token replay detected');
+  }
+
+  // Old token atomically claimed. Issue new tokens.
+  const newAccessToken = generateToken();
+  const newRefreshToken = generateToken();
+
+  await prisma.oAuthAccessToken.create({
+    data: {
+      tokenHash: sha256(newAccessToken),
+      clientId: clientInternalId,
+      userId: token.userId,
+      scope,
+      expiresAt: new Date(Date.now() + ACCESS_TOKEN_TTL_MS),
+      refreshTokenHash: sha256(newRefreshToken),
+      refreshExpiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+    },
+  });
+
+  return {
+    accessToken: newAccessToken,
+    refreshToken: newRefreshToken,
+    expiresIn: Math.floor(ACCESS_TOKEN_TTL_MS / 1000),
+    scope,
+  };
 }
 
 // --- Token Verification (for MCP transport auth) ---
@@ -357,6 +435,7 @@ export async function verifyAccessToken(accessToken: string): Promise<AuthInfo> 
   }
 
   if (!token.user.isActive) {
+    logSecurityEvent('inactive_user_token_use', { userId: token.userId, clientId: token.clientId });
     throw new OAuthError('invalid_token', 'User account inactive');
   }
 
@@ -373,32 +452,58 @@ export async function verifyAccessToken(accessToken: string): Promise<AuthInfo> 
 
 // --- Token Revocation ---
 
+/**
+ * Revoke a token and return the userId of the affected token (if found).
+ * Returns userId so callers can clean up associated resources (e.g. MCP sessions).
+ */
 export async function revokeToken(
   clientInternalId: string,
   token: string,
   tokenTypeHint?: 'access_token' | 'refresh_token'
-): Promise<void> {
+): Promise<string | null> {
   const hash = sha256(token);
 
-  // Try as access token first (or if hinted)
+  // Try as access token first (or if hinted) - atomic revocation to prevent double-log
   if (!tokenTypeHint || tokenTypeHint === 'access_token') {
     const result = await prisma.oAuthAccessToken.updateMany({
       where: { tokenHash: hash, clientId: clientInternalId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
-    if (result.count > 0) return;
+    if (result.count > 0) {
+      // Fetch userId for session cleanup and logging
+      const revoked = await prisma.oAuthAccessToken.findFirst({
+        where: { tokenHash: hash, clientId: clientInternalId },
+        select: { userId: true },
+      });
+      if (revoked) {
+        logSecurityEvent('token_revoked', { clientId: clientInternalId, userId: revoked.userId, type: 'access_token' });
+        return revoked.userId;
+      }
+      return null;
+    }
   }
 
-  // Try as refresh token
+  // Try as refresh token - atomic revocation
   if (!tokenTypeHint || tokenTypeHint === 'refresh_token') {
     const result = await prisma.oAuthAccessToken.updateMany({
       where: { refreshTokenHash: hash, clientId: clientInternalId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
-    if (result.count > 0) return;
+    if (result.count > 0) {
+      const revoked = await prisma.oAuthAccessToken.findFirst({
+        where: { refreshTokenHash: hash, clientId: clientInternalId },
+        select: { userId: true },
+      });
+      if (revoked) {
+        logSecurityEvent('token_revoked', { clientId: clientInternalId, userId: revoked.userId, type: 'refresh_token' });
+        return revoked.userId;
+      }
+      return null;
+    }
   }
 
   // Per RFC 7009, if the token is not found or already revoked, do nothing (no error)
+  return null;
 }
 
 // --- User Consent ---
@@ -450,7 +555,7 @@ export async function rejectClient(clientId: string): Promise<void> {
   });
 }
 
-export async function listClients(status?: string) {
+export async function listClients(status?: string, limit = 50, offset = 0) {
   return prisma.oAuthClient.findMany({
     where: status ? { status } : undefined,
     select: {
@@ -465,6 +570,8 @@ export async function listClients(status?: string) {
       approvedBy: { select: { username: true } },
     },
     orderBy: { createdAt: 'desc' },
+    take: limit,
+    skip: offset,
   });
 }
 
@@ -491,6 +598,14 @@ export async function cleanupExpiredOAuthData(): Promise<void> {
   // Delete expired consents
   await prisma.oAuthUserConsent.deleteMany({
     where: { expiresAt: { lt: now } },
+  });
+
+  // Delete stale pending client registrations (older than 7 days)
+  await prisma.oAuthClient.deleteMany({
+    where: {
+      status: 'pending_approval',
+      createdAt: { lt: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) },
+    },
   });
 }
 

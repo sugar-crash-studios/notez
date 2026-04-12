@@ -25,6 +25,7 @@ export class McpSessionManager {
   private reaperInterval: ReturnType<typeof setInterval> | null = null;
 
   start(): void {
+    if (this.reaperInterval) return; // Guard against double-start
     // Run idle reaper every 60 seconds
     this.reaperInterval = setInterval(() => this.reapIdleSessions(), 60_000);
   }
@@ -80,9 +81,28 @@ export class McpSessionManager {
     return this.sessions.size;
   }
 
+  /**
+   * Close and remove all sessions for a given user.
+   * Called when tokens are revoked to prevent orphaned sessions.
+   */
+  async closeUserSessions(userId: string): Promise<number> {
+    const entries = Array.from(this.sessions.entries());
+    let closed = 0;
+    for (const [sessionId, session] of entries) {
+      if (session.userId === userId) {
+        try { await session.transport.close(); } catch { /* best-effort */ }
+        this.removeSession(sessionId);
+        closed++;
+      }
+    }
+    return closed;
+  }
+
   private reapIdleSessions(): void {
     const now = Date.now();
-    for (const [sessionId, session] of this.sessions) {
+    // Snapshot entries to avoid modifying Map during iteration
+    const entries = Array.from(this.sessions.entries());
+    for (const [sessionId, session] of entries) {
       if (now - session.lastActivity > SESSION_IDLE_TIMEOUT_MS) {
         session.transport.close().catch(() => {});
         this.removeSession(sessionId);
@@ -91,14 +111,15 @@ export class McpSessionManager {
   }
 
   async closeAll(): Promise<void> {
-    for (const [sessionId, session] of this.sessions) {
+    // Snapshot entries to avoid modifying Map during iteration
+    const entries = Array.from(this.sessions.entries());
+    for (const [sessionId, session] of entries) {
       try {
         await session.transport.close();
       } catch {
         // best-effort cleanup
       }
-      this.sessions.delete(sessionId);
+      this.removeSession(sessionId);
     }
-    this.userSessionCounts.clear();
   }
 }

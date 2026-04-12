@@ -98,6 +98,15 @@ CREATE INDEX "oauth_access_tokens_refresh_token_hash_idx" ON "oauth_access_token
 -- CreateIndex
 CREATE UNIQUE INDEX "oauth_user_consents_user_id_client_id_key" ON "oauth_user_consents"("user_id", "client_id");
 
+-- CreateIndex (for cleanup queries)
+CREATE INDEX "oauth_authorization_codes_expires_at_idx" ON "oauth_authorization_codes"("expires_at");
+
+-- CreateIndex (for cleanup queries - partial index on non-revoked tokens)
+CREATE INDEX "oauth_access_tokens_expires_at_idx" ON "oauth_access_tokens"("expires_at") WHERE "revoked_at" IS NULL;
+
+-- CreateIndex (for consent expiry cleanup)
+CREATE INDEX "oauth_user_consents_expires_at_idx" ON "oauth_user_consents"("expires_at");
+
 -- AddForeignKey
 ALTER TABLE "oauth_clients" ADD CONSTRAINT "oauth_clients_approved_by_user_id_fkey" FOREIGN KEY ("approved_by_user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 

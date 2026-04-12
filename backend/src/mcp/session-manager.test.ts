@@ -94,4 +94,29 @@ describe('McpSessionManager', () => {
     expect(s2.transport.close).toHaveBeenCalled();
     expect(manager.getSessionCount()).toBe(0);
   });
+
+  it('closeUserSessions closes only the target user sessions', async () => {
+    const s1 = mockSession('user-1');
+    const s2 = mockSession('user-1');
+    const s3 = mockSession('user-2');
+    manager.addSession('sess-1', s1);
+    manager.addSession('sess-2', s2);
+    manager.addSession('sess-3', s3);
+
+    const closed = await manager.closeUserSessions('user-1');
+
+    expect(closed).toBe(2);
+    expect(s1.transport.close).toHaveBeenCalled();
+    expect(s2.transport.close).toHaveBeenCalled();
+    expect(s3.transport.close).not.toHaveBeenCalled();
+    expect(manager.getSessionCount()).toBe(1);
+    expect(manager.getSession('sess-3')).toBe(s3);
+  });
+
+  it('closeUserSessions returns 0 for unknown user', async () => {
+    manager.addSession('sess-1', mockSession('user-1'));
+    const closed = await manager.closeUserSessions('user-999');
+    expect(closed).toBe(0);
+    expect(manager.getSessionCount()).toBe(1);
+  });
 });

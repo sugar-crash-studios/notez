@@ -1,4 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { z } from 'zod';
+import { prisma } from '../lib/db.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.middleware.js';
 import {
   registerClient,
@@ -9,14 +11,39 @@ import {
   exchangeRefreshToken,
   revokeToken,
   grantConsent,
+  hasActiveConsent,
   approveClient,
   rejectClient,
   listClients,
   OAuthError,
   validateRedirectUri,
+  cleanupExpiredOAuthData,
 } from './oauth.service.js';
 
 const MCP_SCOPES_SUPPORTED = ['mcp:read', 'mcp:write'];
+
+// DCR request body schema
+const dcrBodySchema = z.object({
+  client_name: z.string().max(255).optional(),
+  client_uri: z.string().url().max(2048).optional(),
+  redirect_uris: z.array(z.string().url().max(2048)).min(1, 'At least one redirect_uri is required'),
+  grant_types: z.array(z.enum(['authorization_code', 'refresh_token'])).optional(),
+  response_types: z.array(z.enum(['code'])).optional(),
+  scope: z.string().max(500).optional().refine(
+    (s) => !s || s.split(' ').every((scope) => MCP_SCOPES_SUPPORTED.includes(scope)),
+    { message: 'Unsupported scope value' }
+  ),
+  token_endpoint_auth_method: z.enum(['client_secret_post']).optional(),
+});
+
+// Resolve base URL from server config, not request headers
+function getBaseUrl(): string {
+  const appUrl = process.env.APP_URL;
+  if (!appUrl) {
+    throw new Error('APP_URL environment variable is required for OAuth');
+  }
+  return appUrl.replace(/\/+$/, ''); // strip trailing slash
+}
 
 /**
  * OAuth 2.1 routes for remote MCP connector.
@@ -36,6 +63,15 @@ export async function oauthRoutes(fastify: FastifyInstance) {
       return reply.code(statusCode).send(error.toJSON());
     }
 
+    // Handle Fastify/middleware errors with explicit status codes (e.g. 401 from authenticateToken, 403 from requireAdmin)
+    const err = error as { statusCode?: number; name?: string; message?: string };
+    if (typeof err.statusCode === 'number' && err.statusCode < 500) {
+      return reply.code(err.statusCode).send({
+        error: err.name || 'Error',
+        error_description: err.message || 'Request failed',
+      });
+    }
+
     // Fallback
     fastify.log.error(error);
     return reply.code(500).send({
@@ -44,11 +80,27 @@ export async function oauthRoutes(fastify: FastifyInstance) {
     });
   });
 
+  // Register application/x-www-form-urlencoded parser for RFC 6749 compliance
+  // OAuth token/revoke endpoints MUST accept form-encoded bodies per spec
+  fastify.addContentTypeParser(
+    'application/x-www-form-urlencoded',
+    { parseAs: 'string' },
+    (_req: any, body: string, done: (err: null, result: unknown) => void) => {
+      done(null, Object.fromEntries(new URLSearchParams(body)));
+    }
+  );
+
   // --- Metadata Endpoints ---
 
+  // Start OAuth cleanup interval (hourly)
+  const cleanupInterval = setInterval(() => {
+    cleanupExpiredOAuthData().catch((err) => fastify.log.error(err, 'OAuth cleanup failed'));
+  }, 60 * 60 * 1000);
+  fastify.addHook('onClose', async () => clearInterval(cleanupInterval));
+
   // RFC 8414: OAuth Authorization Server Metadata
-  fastify.get('/.well-known/oauth-authorization-server', async (request) => {
-    const baseUrl = getBaseUrl(request);
+  fastify.get('/.well-known/oauth-authorization-server', async () => {
+    const baseUrl = getBaseUrl();
     return {
       issuer: baseUrl,
       authorization_endpoint: `${baseUrl}/mcp/oauth/authorize`,
@@ -65,8 +117,8 @@ export async function oauthRoutes(fastify: FastifyInstance) {
   });
 
   // RFC 9728: OAuth Protected Resource Metadata
-  fastify.get('/.well-known/oauth-protected-resource', async (request) => {
-    const baseUrl = getBaseUrl(request);
+  fastify.get('/.well-known/oauth-protected-resource', async () => {
+    const baseUrl = getBaseUrl();
     return {
       resource: `${baseUrl}/mcp`,
       authorization_servers: [baseUrl],
@@ -86,21 +138,20 @@ export async function oauthRoutes(fastify: FastifyInstance) {
       },
     },
   }, async (request: FastifyRequest, reply: FastifyReply) => {
-    const body = request.body as Record<string, unknown>;
-
-    if (!body || !Array.isArray(body.redirect_uris) || !body.redirect_uris.length) {
-      throw new OAuthError('invalid_client_metadata', 'redirect_uris is required and must be a non-empty array');
+    const parseResult = dcrBodySchema.safeParse(request.body);
+    if (!parseResult.success) {
+      throw new OAuthError('invalid_client_metadata', parseResult.error.issues[0]?.message || 'Invalid client metadata');
     }
+    const body = parseResult.data;
 
     const result = await registerClient({
-      clientName: typeof body.client_name === 'string' ? body.client_name : undefined,
-      clientUri: typeof body.client_uri === 'string' ? body.client_uri : undefined,
-      redirectUris: body.redirect_uris as string[],
-      grantTypes: Array.isArray(body.grant_types) ? body.grant_types as string[] : undefined,
-      responseTypes: Array.isArray(body.response_types) ? body.response_types as string[] : undefined,
-      scope: typeof body.scope === 'string' ? body.scope : undefined,
-      tokenEndpointAuthMethod: typeof body.token_endpoint_auth_method === 'string'
-        ? body.token_endpoint_auth_method : undefined,
+      clientName: body.client_name,
+      clientUri: body.client_uri,
+      redirectUris: body.redirect_uris,
+      grantTypes: body.grant_types,
+      responseTypes: body.response_types,
+      scope: body.scope,
+      tokenEndpointAuthMethod: body.token_endpoint_auth_method,
     });
 
     reply.code(201);
@@ -140,17 +191,30 @@ export async function oauthRoutes(fastify: FastifyInstance) {
       code_challenge_method,
     } = query;
 
-    // Validate required params
+    // Validate required params (RFC 6749 s4.1.2.1: validate client_id and redirect_uri before using them in error responses)
+    if (!client_id || !redirect_uri || !code_challenge) {
+      return reply.code(400).send({
+        error: 'invalid_request',
+        error_description: 'Missing required parameters: client_id, redirect_uri, code_challenge',
+      });
+    }
+
     if (response_type !== 'code') {
       return sendAuthError(reply, redirect_uri, state, 'unsupported_response_type', 'Only code is supported');
     }
 
-    if (!client_id || !redirect_uri || !code_challenge) {
-      return sendAuthError(reply, redirect_uri, state, 'invalid_request', 'Missing required parameters: client_id, redirect_uri, code_challenge');
-    }
-
     if (code_challenge_method && code_challenge_method !== 'S256') {
       return sendAuthError(reply, redirect_uri, state, 'invalid_request', 'Only S256 code_challenge_method is supported');
+    }
+
+    // Validate state length
+    if (state && state.length > 2048) {
+      return sendAuthError(reply, redirect_uri, state?.substring(0, 100), 'invalid_request', 'state parameter too long');
+    }
+
+    // Validate code_challenge is valid S256 base64url (43 chars)
+    if (code_challenge && !/^[A-Za-z0-9\-_]{43}$/.test(code_challenge)) {
+      return sendAuthError(reply, redirect_uri, state, 'invalid_request', 'Invalid code_challenge format for S256');
     }
 
     // Validate client
@@ -168,16 +232,56 @@ export async function oauthRoutes(fastify: FastifyInstance) {
       });
     }
 
-    // Validate scope
+    // Validate scope against global supported scopes
     const requestedScope = scope || 'mcp:read';
     const requestedScopes = requestedScope.split(' ');
     if (requestedScopes.some((s) => !MCP_SCOPES_SUPPORTED.includes(s))) {
       return sendAuthError(reply, redirect_uri, state, 'invalid_scope', 'Unsupported scope');
     }
 
+    // Validate scope against client's registered scope (prevents scope escalation)
+    const clientScopes = (client.scope || 'mcp:read').split(' ');
+    if (requestedScopes.some((s) => !clientScopes.includes(s))) {
+      return sendAuthError(reply, redirect_uri, state, 'invalid_scope', 'Scope exceeds client registration');
+    }
+
+    // Fast-path: if user has a valid Bearer token and active consent, skip consent page.
+    // We manually extract the token instead of calling authenticateToken (which writes 401 to reply on failure,
+    // making it impossible to fall through to the consent page redirect).
+    const authHeader = request.headers.authorization;
+    if (authHeader?.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.substring(7);
+        if (token.length <= 1000) {
+          const decoded = fastify.jwt.verify<{ userId: string }>(token);
+          const userId = decoded.userId;
+          if (!userId) throw new Error('no userId');
+          // Block service accounts from the fast-path (same guard as /approve)
+          const userRecord = await prisma.user.findUnique({ where: { id: userId }, select: { isServiceAccount: true } });
+          if (userRecord?.isServiceAccount) throw new Error('service account');
+          if (await hasActiveConsent(userId, client.id, requestedScope)) {
+            // User already consented within TTL; issue code directly
+            const code = await createAuthorizationCode({
+              clientId: client.id,
+              userId,
+              redirectUri: redirect_uri,
+              scope: requestedScope,
+              codeChallenge: code_challenge,
+              codeChallengeMethod: code_challenge_method || 'S256',
+            });
+            const callbackUrl = new URL(redirect_uri);
+            callbackUrl.searchParams.set('code', code);
+            if (state) callbackUrl.searchParams.set('state', state);
+            return reply.redirect(callbackUrl.toString());
+          }
+        }
+      } catch {
+        // Token invalid/expired - fall through to consent page (expected)
+      }
+    }
+
     // Redirect to consent page with all params
-    // The consent page handles login (if needed) and user approval
-    const consentUrl = new URL('/oauth/consent', getBaseUrl(request));
+    const consentUrl = new URL('/oauth/consent', getBaseUrl());
     consentUrl.searchParams.set('client_id', client_id);
     consentUrl.searchParams.set('redirect_uri', redirect_uri);
     consentUrl.searchParams.set('scope', requestedScope);
@@ -189,10 +293,23 @@ export async function oauthRoutes(fastify: FastifyInstance) {
   });
 
   // Internal endpoint: consent page calls this after user approves
-  // Requires authenticated session (JWT cookie or Bearer)
+  // Requires authenticated session (Bearer token) + same-origin CSRF check
   fastify.post('/mcp/oauth/approve', {
     preHandler: authenticateToken,
   }, async (request: FastifyRequest, reply: FastifyReply) => {
+    // CSRF defense: verify request originates from our own consent page
+    const origin = request.headers.origin;
+    const appUrl = getBaseUrl();
+    const appOrigin = new URL(appUrl).origin;
+    if (origin && origin !== appOrigin) {
+      throw new OAuthError('invalid_request', 'Cross-origin consent requests are not allowed');
+    }
+    // Also check Sec-Fetch-Site if the browser sends it (modern browsers)
+    const secFetchSite = request.headers['sec-fetch-site'] as string | undefined;
+    if (secFetchSite && secFetchSite !== 'same-origin') {
+      throw new OAuthError('invalid_request', 'Cross-origin consent requests are not allowed');
+    }
+
     const body = request.body as Record<string, string>;
     const {
       client_id,
@@ -207,6 +324,12 @@ export async function oauthRoutes(fastify: FastifyInstance) {
       throw new OAuthError('invalid_request', 'Missing required parameters');
     }
 
+    // Block service accounts from authorizing MCP clients
+    const userRecord = await prisma.user.findUnique({ where: { id: request.user!.userId }, select: { isServiceAccount: true } });
+    if (userRecord?.isServiceAccount) {
+      throw new OAuthError('access_denied', 'Service accounts cannot authorize MCP clients');
+    }
+
     const client = await getClientByClientId(client_id);
     if (!client || client.status !== 'approved') {
       throw new OAuthError('unauthorized_client', 'Client not approved');
@@ -214,6 +337,16 @@ export async function oauthRoutes(fastify: FastifyInstance) {
 
     if (!client.redirectUris.includes(redirect_uri)) {
       throw new OAuthError('invalid_request', 'Invalid redirect_uri');
+    }
+
+    // Validate scope against both global supported scopes and client's registered scope
+    const requestedScopes = scope.split(' ');
+    if (requestedScopes.some((s) => !MCP_SCOPES_SUPPORTED.includes(s))) {
+      throw new OAuthError('invalid_scope', 'Unsupported scope');
+    }
+    const clientScopes = (client.scope || 'mcp:read').split(' ');
+    if (requestedScopes.some((s) => !clientScopes.includes(s))) {
+      throw new OAuthError('invalid_scope', 'Scope exceeds client registration');
     }
 
     const userId = request.user!.userId;
@@ -309,7 +442,15 @@ export async function oauthRoutes(fastify: FastifyInstance) {
 
   // --- Token Revocation (RFC 7009) ---
 
-  fastify.post('/mcp/oauth/revoke', async (request: FastifyRequest) => {
+  fastify.post('/mcp/oauth/revoke', {
+    config: {
+      rateLimit: {
+        max: 20,
+        timeWindow: '1 minute',
+        keyGenerator: (request: FastifyRequest) => `revoke:${request.ip}`,
+      },
+    },
+  }, async (request: FastifyRequest) => {
     const body = request.body as Record<string, string>;
     const { token, token_type_hint, client_id, client_secret } = body;
 
@@ -319,11 +460,20 @@ export async function oauthRoutes(fastify: FastifyInstance) {
 
     const client = await validateClientCredentials(client_id, client_secret);
 
-    await revokeToken(
-      client.id,
-      token,
-      token_type_hint as 'access_token' | 'refresh_token' | undefined
-    );
+    const hint = token_type_hint === 'access_token' || token_type_hint === 'refresh_token'
+      ? token_type_hint : undefined;
+
+    const revokedUserId = await revokeToken(client.id, token, hint);
+
+    // Best-effort: close any active MCP sessions for the revoked user
+    if (revokedUserId) {
+      try {
+        const { sessionManager } = await import('./transport.routes.js');
+        await sessionManager.closeUserSessions(revokedUserId);
+      } catch {
+        // MCP transport not loaded (MCP_REMOTE_ENABLED=false) - no sessions to clean
+      }
+    }
 
     // RFC 7009: always 200 OK, even if token was already revoked
     return {};
@@ -335,7 +485,11 @@ export async function oauthRoutes(fastify: FastifyInstance) {
     preHandler: [authenticateToken, requireAdmin],
   }, async (request: FastifyRequest) => {
     const query = request.query as Record<string, string>;
-    return listClients(query.status || undefined);
+    const validStatuses = ['pending_approval', 'approved', 'rejected'];
+    const status = query.status && validStatuses.includes(query.status) ? query.status : undefined;
+    const limit = Math.min(Math.max(parseInt(query.limit || '50', 10) || 50, 1), 100);
+    const offset = Math.max(parseInt(query.offset || '0', 10) || 0, 0);
+    return listClients(status, limit, offset);
   });
 
   fastify.post('/mcp/oauth/clients/:clientId/approve', {
@@ -356,12 +510,6 @@ export async function oauthRoutes(fastify: FastifyInstance) {
 }
 
 // --- Helpers ---
-
-function getBaseUrl(request: FastifyRequest): string {
-  const proto = request.headers['x-forwarded-proto'] || 'https';
-  const host = request.headers['x-forwarded-host'] || request.headers.host;
-  return `${proto}://${host}`;
-}
 
 function sendAuthError(
   reply: FastifyReply,
