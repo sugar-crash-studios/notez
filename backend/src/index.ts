@@ -29,6 +29,8 @@ import { adminRoutes } from './routes/admin.routes.js';
 import { tokenRoutes } from './routes/token.routes.js';
 import { mcpRoutes } from './routes/mcp.routes.js';
 import { webhooksRoutes } from './routes/webhooks.routes.js';
+import { oauthRoutes } from './mcp/oauth.routes.js';
+import { mcpTransportRoutes } from './mcp/transport.routes.js';
 import { prisma, disconnectPrisma } from './lib/db.js';
 import { storageService } from './services/storage.service.js';
 import { hocuspocusServer } from './services/collaboration.service.js';
@@ -212,6 +214,14 @@ await fastify.register(tokenRoutes, { prefix: '/api' }); // API token management
 await fastify.register(webhooksRoutes, { prefix: '/api' }); // Webhook subscriptions & delivery log
 await fastify.register(mcpRoutes, { prefix: '/api/mcp' }); // MCP API endpoints (legacy — kept for backwards compatibility)
 await fastify.register(mcpRoutes, { prefix: '/api/v1' });  // Versioned external API
+
+// Remote MCP connector (OAuth 2.1 + Streamable HTTP transport)
+// Feature-gated: only registers routes when MCP_REMOTE_ENABLED=true
+if (process.env.MCP_REMOTE_ENABLED === 'true') {
+  await fastify.register(oauthRoutes);  // /.well-known/* + /mcp/oauth/* (mounted at root for well-known paths)
+  await fastify.register(mcpTransportRoutes);  // POST/GET/DELETE /mcp (Streamable HTTP transport)
+  console.log('🔌 Remote MCP connector enabled');
+}
 
 // Serve frontend static files (in production)
 // Get the directory of the current module
