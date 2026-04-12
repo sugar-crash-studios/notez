@@ -68,6 +68,12 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-notez}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
       MINIO_BUCKET: ${MINIO_BUCKET:-notez-images}
+      # Remote MCP Connector (claude.ai web/mobile access)
+      # Set to "true" to enable OAuth 2.1 endpoints + Streamable HTTP transport at /mcp
+      # Note: /mcp is stateful (in-memory sessions) — do not scale horizontally without external session store
+      MCP_REMOTE_ENABLED: ${MCP_REMOTE_ENABLED:-false}
+      # Comma-separated list of allowed origins for MCP transport CORS
+      MCP_ALLOWED_ORIGINS: ${MCP_ALLOWED_ORIGINS:-https://claude.ai,https://www.claude.ai}
     depends_on:
       notez-db:
         condition: service_healthy

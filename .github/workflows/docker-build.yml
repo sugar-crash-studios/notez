@@ -33,6 +33,9 @@ jobs:
       - name: Run backend tests
         run: npx vitest run
         working-directory: backend
+      - name: Audit backend dependencies
+        run: npm audit --audit-level=high || echo "::warning::npm audit found high+ vulnerabilities"
+        working-directory: backend
       - name: Install frontend dependencies
         run: npm ci
         working-directory: frontend

@@ -29,6 +29,8 @@ import { adminRoutes } from './routes/admin.routes.js';
 import { tokenRoutes } from './routes/token.routes.js';
 import { mcpRoutes } from './routes/mcp.routes.js';
 import { webhooksRoutes } from './routes/webhooks.routes.js';
+import { oauthRoutes } from './mcp/oauth.routes.js';
+import { mcpTransportRoutes } from './mcp/transport.routes.js';
 import { prisma, disconnectPrisma } from './lib/db.js';
 import { storageService } from './services/storage.service.js';
 import { hocuspocusServer } from './services/collaboration.service.js';
@@ -213,6 +215,17 @@ await fastify.register(webhooksRoutes, { prefix: '/api' }); // Webhook subscript
 await fastify.register(mcpRoutes, { prefix: '/api/mcp' }); // MCP API endpoints (legacy — kept for backwards compatibility)
 await fastify.register(mcpRoutes, { prefix: '/api/v1' });  // Versioned external API
 
+// Remote MCP connector (OAuth 2.1 + Streamable HTTP transport)
+// Feature-gated: only registers routes when MCP_REMOTE_ENABLED=true
+if (process.env.MCP_REMOTE_ENABLED === 'true') {
+  if (!process.env.APP_URL) {
+    throw new Error('APP_URL must be set when MCP_REMOTE_ENABLED=true (required for OAuth metadata)');
+  }
+  await fastify.register(oauthRoutes);  // /.well-known/* + /mcp/oauth/* (mounted at root for well-known paths)
+  await fastify.register(mcpTransportRoutes);  // POST/GET/DELETE /mcp (Streamable HTTP transport)
+  console.log('🔌 Remote MCP connector enabled');
+}
+
 // Serve frontend static files (in production)
 // Get the directory of the current module
 const __filename = fileURLToPath(import.meta.url);
@@ -229,8 +242,8 @@ await fastify.register(fastifyStatic, {
 
 // Fallback route for SPA - send index.html for all non-API routes
 fastify.setNotFoundHandler(async (request, reply) => {
-  // Don't handle API routes or health check
-  if (request.url.startsWith('/api') || request.url.startsWith('/health')) {
+  // Don't handle API routes, health check, or MCP endpoints
+  if (request.url.startsWith('/api') || request.url.startsWith('/health') || request.url.startsWith('/mcp')) {
     reply.code(404).send({ error: 'Not found' });
     return;
   }
@@ -270,6 +283,14 @@ const gracefulShutdown = async (signal: string) => {
   console.log(`\n${signal} received, closing server gracefully...`);
   try {
     stopWebhookWorker();
+    // Explicitly drain MCP sessions before closing Fastify (don't rely solely on onClose hook)
+    if (process.env.MCP_REMOTE_ENABLED === 'true') {
+      try {
+        const { sessionManager } = await import('./mcp/transport.routes.js');
+        sessionManager.stop();
+        await sessionManager.closeAll();
+      } catch { /* MCP not loaded */ }
+    }
     await hocuspocusServer.closeConnections();
     await fastify.close();
     await disconnectPrisma();

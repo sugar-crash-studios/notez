@@ -11,6 +11,7 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { EditorPage } from './pages/EditorPage';
 import { SettingsHub } from './pages/SettingsHub';
+import { OAuthConsentPage } from './pages/OAuthConsentPage';
 
 function AppRoutes() {
   const { setupNeeded, isLoading, user } = useAuth();
@@ -49,6 +50,7 @@ function AppRoutes() {
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/change-password" element={<ChangePasswordPage />} />
+      <Route path="/oauth/consent" element={<OAuthConsentPage />} />
       {/* Settings routes with nested section parameter */}
       <Route
         path="/settings/:section?"

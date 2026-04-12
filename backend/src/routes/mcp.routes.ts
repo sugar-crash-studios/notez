@@ -11,6 +11,7 @@ import { shareNote, listSharesForNote, unshareNote, updateSharePermission } from
 import { hashToken } from '../services/token.service.js';
 import { BadRequestError } from '../utils/errors.js';
 import { FOLDER_ICONS } from '../utils/validation.schemas.js';
+import { htmlToPlainText } from '../utils/html.js';
 
 // --- Query/Body schemas for MCP routes ---
 
@@ -141,18 +142,6 @@ const shareIdParam = z.object({
 const updateSharePermissionBody = z.object({
   permission: z.enum(['VIEW', 'EDIT']),
 });
-
-/**
- * Strip HTML tags, decode entities, and collapse whitespace for AI consumption
- */
-function htmlToPlainText(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
-    .replace(/\s+/g, ' ')
-    .trim();
-}
 
 /**
  * Per-token rate limit config for MCP routes (120 requests/min per token)

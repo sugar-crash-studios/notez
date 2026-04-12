@@ -12,6 +12,14 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '1.23.0',
+    date: '2026-04-12',
+    added: [
+      'Connect Notez to Claude on mobile and web via claude.ai Settings > Connectors',
+      'Ask Claude about your notes and tasks from your phone, tablet, or browser',
+    ],
+  },
+  {
     version: '1.22.0',
     date: '2026-04-06',
     added: [

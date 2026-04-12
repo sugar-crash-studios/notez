@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.23.0] - 2026-04-12
+
+### Added
+
+- **Remote MCP Connector**: Notez can now be connected to claude.ai as a custom connector, enabling access from Claude on web, desktop, and mobile devices.
+  - OAuth 2.1 authorization server with PKCE, Dynamic Client Registration, and refresh token rotation
+  - MCP Streamable HTTP transport at `/mcp` (POST/GET/DELETE) per MCP spec 2025-03-26
+  - Consent UX page at `/oauth/consent` showing requesting app, permissions, and account info
+  - Feature-gated via `MCP_REMOTE_ENABLED` environment variable (default: off)
+  - Admin-approve DCR: new client registrations require admin approval before use
+  - Read-only scoped tools in v1.23 (`mcp:read`); write scope (`mcp:write`) planned for v1.24
+  - Per-user session caps (5), global session cap (100), idle session reaper (10 min)
+  - Shared tool registration module: both stdio `notez-mcp` and remote connector use the same tool definitions
+  - Delimiter-wrapped tool responses to mitigate prompt injection via note content
+  - OAuth tables: `oauth_clients`, `oauth_authorization_codes`, `oauth_access_tokens`, `oauth_user_consents`
+
+### Security
+
+- Strict redirect URI allowlist (code-level, not configurable) for OAuth clients
+- PKCE (S256) mandatory on all authorization flows
+- Refresh token rotation with replay detection (revokes entire token family on reuse)
+- Authorization codes: single-use, 10-minute TTL, stored hashed
+- Client secrets: bcrypt hashed
+- Session-to-token binding prevents session fixation across users
+- Origin header allowlist on MCP transport (configurable via `MCP_ALLOWED_ORIGINS`)
+- Rate limits on DCR (5/15min), authorize (30/min), token (20/min), transport (60/min)
+
 ## [1.22.0] - 2026-04-06
 
 ### Added
