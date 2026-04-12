@@ -59,7 +59,7 @@ RUN npx prisma generate
 RUN if [ -d "dist" ] && [ "$(ls -A dist)" ]; then \
       echo "Using pre-built TypeScript artifacts"; \
     else \
-      NODE_OPTIONS="--max-old-space-size=4096" npm run build; \
+      NODE_OPTIONS="--max-old-space-size=6144" npm run build; \
     fi
 
 # Note: NOT pruning devDependencies because we need prisma CLI for migrations
