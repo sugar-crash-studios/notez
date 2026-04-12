@@ -42,6 +42,8 @@ jobs:
       - name: Build backend TypeScript
         run: npm run build
         working-directory: backend
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
 
       # Frontend: install, test, build
       - name: Install frontend dependencies
