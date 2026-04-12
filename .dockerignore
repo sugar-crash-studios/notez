@@ -11,18 +11,13 @@ docs/
 node_modules/
 **/node_modules/
 
-# Build artifacts (will be built in container)
-dist/
-**/dist/
+# Build artifacts (may be pre-built in CI or built in container)
+# dist/ directories are NOT excluded - CI pre-builds them to avoid OOM in buildx
 build/
 **/build/
 
-# Frontend specific
-frontend/dist/
+# Node modules (will be installed in container)
 frontend/node_modules/
-
-# Backend specific
-backend/dist/
 backend/node_modules/
 
 # Development files

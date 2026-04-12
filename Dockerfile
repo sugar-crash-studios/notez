@@ -26,8 +26,13 @@ RUN if [ -z "$APP_VERSION" ]; then \
       echo "VITE_APP_VERSION=$APP_VERSION" >> .env.production; \
     fi
 
-# Build frontend for production (Vite will read from .env.production)
-RUN npm run build
+# Build frontend for production (Vite reads from .env.production)
+# Skip if dist/ already exists (pre-built in CI)
+RUN if [ -d "dist" ] && [ "$(ls -A dist)" ]; then \
+      echo "Using pre-built frontend artifacts"; \
+    else \
+      npm run build; \
+    fi
 
 # Stage 2: Build Backend
 FROM node:20-alpine AS backend-builder
@@ -49,8 +54,13 @@ COPY backend/ ./
 # Generate Prisma Client
 RUN npx prisma generate
 
-# Build backend TypeScript (heap bump needed for large MCP SDK dependency tree)
-RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build
+# Build backend TypeScript
+# If dist/ already exists (pre-built in CI), skip tsc. Otherwise build in-container.
+RUN if [ -d "dist" ] && [ "$(ls -A dist)" ]; then \
+      echo "Using pre-built TypeScript artifacts"; \
+    else \
+      NODE_OPTIONS="--max-old-space-size=4096" npm run build; \
+    fi
 
 # Note: NOT pruning devDependencies because we need prisma CLI for migrations
 # The prisma package is required for running "npx prisma migrate deploy" in production
