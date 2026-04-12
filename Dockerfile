@@ -49,8 +49,8 @@ COPY backend/ ./
 # Generate Prisma Client
 RUN npx prisma generate
 
-# Build backend TypeScript (increase heap for large dependency tree)
-RUN NODE_OPTIONS="--max-old-space-size=2048" npm run build
+# Build backend TypeScript (increase heap for large dependency tree from MCP SDK)
+RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build
 
 # Note: NOT pruning devDependencies because we need prisma CLI for migrations
 # The prisma package is required for running "npx prisma migrate deploy" in production
