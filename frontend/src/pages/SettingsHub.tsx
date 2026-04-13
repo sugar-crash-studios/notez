@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { User, Bot, Shield, ArrowLeft, MessageSquare, Key, Webhook, Sparkles } from 'lucide-react';
+import { User, Bot, Shield, ArrowLeft, MessageSquare, Key, Webhook, Sparkles, Plug } from 'lucide-react';
 import { AppHeader } from '../components/AppHeader';
 import { ProfileSettings } from '../components/ProfileSettings';
 import { AISettings } from '../components/AISettings';
@@ -9,9 +9,10 @@ import { AdminFeedbackPanel } from '../components/AdminFeedbackPanel';
 import { ApiTokenSettings } from '../components/ApiTokenSettings';
 import { AgentSettings } from '../components/AgentSettings';
 import { WebhookSettings } from '../components/WebhookSettings';
+import { McpConnectorSettings } from '../components/McpConnectorSettings';
 import { useAuth } from '../contexts/AuthContext';
 
-export type SettingsSection = 'profile' | 'ai' | 'agents' | 'tokens' | 'webhooks' | 'admin' | 'feedback';
+export type SettingsSection = 'profile' | 'ai' | 'agents' | 'tokens' | 'webhooks' | 'connectors' | 'admin' | 'feedback';
 
 export const SECTION_CONFIG = {
   profile: {
@@ -43,6 +44,12 @@ export const SECTION_CONFIG = {
     icon: Webhook,
     description: 'Push notifications for note and task changes',
     adminOnly: false,
+  },
+  connectors: {
+    label: 'MCP Connectors',
+    icon: Plug,
+    description: 'Manage external app connections (e.g. Claude)',
+    adminOnly: true,
   },
   admin: {
     label: 'Admin Panel',
@@ -95,6 +102,8 @@ export function SettingsHub() {
         return <ApiTokenSettings />;
       case 'webhooks':
         return <WebhookSettings />;
+      case 'connectors':
+        return user?.role === 'admin' ? <McpConnectorSettings /> : null;
       case 'admin':
         return user?.role === 'admin' ? <AdminPanel /> : null;
       case 'feedback':

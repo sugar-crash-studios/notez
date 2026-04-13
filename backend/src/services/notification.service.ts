@@ -1,6 +1,6 @@
 import { prisma } from '../lib/db.js';
 
-export type NotificationType = 'NEW_FEEDBACK' | 'FEEDBACK_STATUS_CHANGE' | 'NEW_RELEASE' | 'NOTE_SHARED';
+export type NotificationType = 'NEW_FEEDBACK' | 'FEEDBACK_STATUS_CHANGE' | 'NEW_RELEASE' | 'NOTE_SHARED' | 'MCP_CLIENT_PENDING';
 
 export interface CreateNotificationInput {
   type: NotificationType;
