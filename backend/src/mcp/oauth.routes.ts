@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/db.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.middleware.js';
+import { notifyAdmins } from '../services/notification.service.js';
 import {
   registerClient,
   validateClientCredentials,
@@ -153,6 +154,15 @@ export async function oauthRoutes(fastify: FastifyInstance) {
       scope: body.scope,
       tokenEndpointAuthMethod: body.token_endpoint_auth_method,
     });
+
+    // Notify admins about the pending client registration
+    notifyAdmins(
+      'MCP_CLIENT_PENDING',
+      `New MCP connector: ${result.clientName || 'Unknown app'}`,
+      'mcp_client',
+      result.clientId,
+      `${result.clientName || 'An application'} is requesting access. Approve or reject in Settings > MCP Connectors.`
+    ).catch((err) => fastify.log.error(err, 'Failed to notify admins about new MCP client'));
 
     reply.code(201);
     return {

@@ -649,3 +649,15 @@ export const notificationsApi = {
   sendReleaseNotification: (version: string, highlights?: string) =>
     api.post('/api/admin/notifications/release', { version, highlights }),
 };
+
+// MCP Connector management (admin only)
+export const mcpConnectorsApi = {
+  list: (status?: string) =>
+    api.get('/mcp/oauth/clients', { params: status ? { status } : undefined }),
+
+  approve: (clientId: string) =>
+    api.post(`/mcp/oauth/clients/${clientId}/approve`),
+
+  reject: (clientId: string) =>
+    api.post(`/mcp/oauth/clients/${clientId}/reject`),
+};

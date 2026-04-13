@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bell, Check, CheckCheck, Trash2, MessageSquare, RefreshCw, Sparkles, Users } from 'lucide-react';
+import { Bell, Check, CheckCheck, Trash2, MessageSquare, RefreshCw, Sparkles, Users, Plug } from 'lucide-react';
 import { notificationsApi } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from './Toast';
@@ -132,6 +132,9 @@ export function NotificationBell() {
     } else if (notification.linkType === 'release') {
       // Navigate to changelog/What's New - clicking the version number in settings
       navigate('/settings/profile');
+    } else if (notification.linkType === 'mcp_client') {
+      // Navigate to MCP Connectors settings for approval
+      navigate('/settings/connectors');
     }
 
     setIsOpen(false);
@@ -147,6 +150,8 @@ export function NotificationBell() {
         return <Users className="w-4 h-4 text-indigo-500" />;
       case 'NEW_RELEASE':
         return <Sparkles className="w-4 h-4 text-purple-500" />;
+      case 'MCP_CLIENT_PENDING':
+        return <Plug className="w-4 h-4 text-orange-500" />;
       default:
         return <Bell className="w-4 h-4 text-gray-500" />;
     }
