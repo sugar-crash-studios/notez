@@ -374,12 +374,15 @@ export async function oauthRoutes(fastify: FastifyInstance) {
       codeChallengeMethod: code_challenge_method || 'S256',
     });
 
-    // Redirect back to client with code
+    // Return the callback URL as JSON instead of 302 redirect.
+    // The consent page uses fetch() which can't follow cross-origin redirects
+    // (CORS blocks fetch from navigating to claude.ai's callback).
+    // The frontend reads this URL and navigates with window.location.href.
     const callbackUrl = new URL(redirect_uri);
     callbackUrl.searchParams.set('code', code);
     if (state) callbackUrl.searchParams.set('state', state);
 
-    return reply.redirect(callbackUrl.toString());
+    return { redirect_url: callbackUrl.toString() };
   });
 
   // --- Token Endpoint ---
