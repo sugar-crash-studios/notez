@@ -129,16 +129,21 @@ export function OAuthConsentPage() {
         }),
       });
 
-      if (response.redirected) {
-        // Server sent a redirect to the client's callback
-        window.location.href = response.url;
-        return;
-      }
-
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
         setError(data.error_description || data.message || 'Authorization failed');
+        return;
       }
+
+      // Server returns JSON with the callback URL (not a 302 redirect,
+      // because fetch can't follow cross-origin redirects due to CORS)
+      const data = await response.json();
+      if (data.redirect_url) {
+        window.location.href = data.redirect_url;
+        return;
+      }
+
+      setError('Unexpected response from server');
     } catch {
       setError('Network error. Please try again.');
     } finally {
