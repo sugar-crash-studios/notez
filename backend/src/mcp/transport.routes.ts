@@ -70,16 +70,23 @@ export async function mcpTransportRoutes(fastify: FastifyInstance) {
     return reply.code(204).send();
   });
 
+  // WWW-Authenticate header per RFC 6750 + MCP spec
+  // Points clients to the protected resource metadata for OAuth discovery
+  const appUrl = process.env.APP_URL?.replace(/\/+$/, '') || '';
+  const wwwAuthenticate = `Bearer resource_metadata="${appUrl}/.well-known/oauth-protected-resource"`;
+
   // Bearer auth middleware for MCP routes
   async function authenticateMcpToken(request: FastifyRequest, reply: FastifyReply): Promise<AuthInfo | null> {
     const authHeader = request.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      reply.header('WWW-Authenticate', wwwAuthenticate);
       reply.code(401).send({ error: 'Unauthorized', message: 'Bearer token required' });
       return null;
     }
 
     const token = authHeader.substring(7);
     if (token.length > 500) {
+      reply.header('WWW-Authenticate', wwwAuthenticate);
       reply.code(401).send({ error: 'Unauthorized', message: 'Token too long' });
       return null;
     }
@@ -87,6 +94,7 @@ export async function mcpTransportRoutes(fastify: FastifyInstance) {
     try {
       return await verifyAccessToken(token);
     } catch (error) {
+      reply.header('WWW-Authenticate', wwwAuthenticate);
       if (error instanceof OAuthError) {
         reply.code(401).send({ error: 'Unauthorized', message: error.message });
       } else {
