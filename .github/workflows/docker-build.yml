@@ -39,11 +39,9 @@ jobs:
       - name: Audit backend dependencies
         run: npm audit --audit-level=high || echo "::warning::npm audit found high+ vulnerabilities"
         working-directory: backend
-      - name: Build backend TypeScript
+      - name: Build backend (esbuild transpilation)
         run: npm run build
         working-directory: backend
-        env:
-          NODE_OPTIONS: "--max-old-space-size=6144"
 
       # Frontend: install, test, build
       - name: Install frontend dependencies

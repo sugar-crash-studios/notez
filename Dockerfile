@@ -54,12 +54,12 @@ COPY backend/ ./
 # Generate Prisma Client
 RUN npx prisma generate
 
-# Build backend TypeScript
-# If dist/ already exists (pre-built in CI), skip tsc. Otherwise build in-container.
+# Build backend TypeScript (uses esbuild for fast, low-memory transpilation)
+# If dist/ already exists (pre-built in CI), skip build. Otherwise build in-container.
 RUN if [ -d "dist" ] && [ "$(ls -A dist)" ]; then \
-      echo "Using pre-built TypeScript artifacts"; \
+      echo "Using pre-built artifacts"; \
     else \
-      NODE_OPTIONS="--max-old-space-size=6144" npm run build; \
+      npm run build; \
     fi
 
 # Note: NOT pruning devDependencies because we need prisma CLI for migrations
