@@ -12,6 +12,14 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '1.27.0',
+    date: '2026-04-14',
+    added: [
+      'Ask Claude to attach links to tasks, check notifications, and submit feedback — all via natural conversation',
+      'Claude can now summarize notes, suggest titles, and suggest tags using your configured AI provider',
+    ],
+  },
+  {
     version: '1.26.0',
     date: '2026-04-13',
     fixed: [
