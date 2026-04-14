@@ -12,6 +12,21 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '1.25.0',
+    date: '2026-04-13',
+    fixed: [
+      'Fixed connection flow for Claude.ai connector setup',
+    ],
+  },
+  {
+    version: '1.24.0',
+    date: '2026-04-13',
+    added: [
+      'Admins can now approve and manage MCP connectors from Settings > MCP Connectors',
+      'Notification when a new app requests to connect via MCP',
+    ],
+  },
+  {
     version: '1.23.0',
     date: '2026-04-12',
     added: [

@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.25.0] - 2026-04-13
+
+### Fixed
+
+- **MCP OAuth Consent Flow**: Fixed "code: Field required" error when connecting via claude.ai. The consent page's `fetch()` could not follow cross-origin 302 redirects to claude.ai's callback (CORS blocks fetch from navigating cross-origin). Changed `/mcp/oauth/approve` to return `{ redirect_url: "..." }` as JSON; frontend navigates via `window.location.href`.
+
+## [1.24.0] - 2026-04-13
+
+### Added
+
+- **MCP Connectors Admin UI**: New "MCP Connectors" section in Settings (admin-only) for managing external app registrations.
+  - Approve, reject, and revoke connector access from the UI
+  - Filter connectors by status (all/pending/approved/rejected)
+  - Auto-refresh every 15s for new registrations
+  - Pending approval count banner
+  - Status badges, scope display, registration timestamp
+- **DCR Notification**: Admin notification on new MCP client registration with click-through to Connectors settings (orange plug icon, `MCP_CLIENT_PENDING` type)
+
 ## [1.23.0] - 2026-04-12
 
 ### Added
