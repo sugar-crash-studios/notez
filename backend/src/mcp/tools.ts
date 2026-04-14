@@ -3,10 +3,13 @@ import { z } from 'zod';
 import { prisma } from '../lib/db.js';
 import { searchService } from '../services/search.service.js';
 import { getNoteById, getNoteByTitle, listNotes, createNote, updateNote, deleteNote, restoreNote } from '../services/note.service.js';
-import { getTaskById, listTasks, createTask, updateTask, deleteTask } from '../services/task.service.js';
+import { getTaskById, listTasks, createTask, updateTask, deleteTask, addTaskLink, updateTaskLink, deleteTaskLink } from '../services/task.service.js';
 import { listFolders, createFolder, updateFolder, deleteFolder } from '../services/folder.service.js';
 import { listTags, renameTag, deleteTag } from '../services/tag.service.js';
 import { shareNote, listSharesForNote, unshareNote, updateSharePermission } from '../services/share.service.js';
+import { getNotifications, getUnreadCount, markAsRead, markAllAsRead, deleteNotification } from '../services/notification.service.js';
+import { createFeedback, getFeedbackById, listUserFeedback } from '../services/feedback.service.js';
+import { aiService, AIProviderNotConfiguredError } from '../services/ai/index.js';
 import { FOLDER_ICONS } from '../utils/validation.schemas.js';
 import { htmlToPlainText } from '../utils/html.js';
 
@@ -296,7 +299,7 @@ defineTool('mcp:read', (server, getUserId) => {
   server.registerTool(
     'notez_list_tasks',
     {
-      description: 'List tasks, optionally filtered by status. Returns tasks sorted by priority.',
+      description: 'List tasks, optionally filtered by status. Returns tasks sorted by priority. Each task includes completedAt (set when status is COMPLETED, null otherwise).',
       inputSchema: {
         status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']).optional()
           .describe('Filter by task status'),
@@ -318,7 +321,7 @@ defineTool('mcp:read', (server, getUserId) => {
   server.registerTool(
     'notez_get_task',
     {
-      description: 'Get a task by its ID. Returns full task details.',
+      description: 'Get a task by its ID. Returns full task details including completedAt (set when status is COMPLETED, null otherwise) and links array.',
       inputSchema: { id: z.string().uuid().describe('Task UUID') },
     },
     async ({ id }) => {
@@ -363,15 +366,15 @@ defineTool('mcp:write', (server, getUserId) => {
   server.registerTool(
     'notez_update_task',
     {
-      description: 'Update a task. Can change title, description, status, priority, due date, folder, or tags.',
+      description: 'Update a task. Can change title, description, status, priority, due date, folder, or tags. Dates must be ISO 8601 strings (e.g. "2026-04-20T00:00:00Z"); priority must be one of LOW, MEDIUM, HIGH, URGENT.',
       inputSchema: {
         id: z.string().uuid().describe('Task UUID'),
         title: z.string().optional().describe('New title'),
         description: z.string().optional().describe('New description'),
-        status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']).optional().describe('New status'),
-        priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional().describe('New priority'),
-        dueDate: z.string().datetime().nullable().optional().describe('Due date or null to clear'),
-        folderId: z.string().uuid().nullable().optional().describe('Folder UUID or null'),
+        status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']).optional().describe('New status: PENDING, IN_PROGRESS, COMPLETED, or CANCELLED'),
+        priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional().describe('New priority: LOW, MEDIUM, HIGH, or URGENT'),
+        dueDate: z.string().datetime().nullable().optional().describe('Due date in ISO 8601 format e.g. "2026-04-20T00:00:00Z", or null to clear'),
+        folderId: z.string().uuid().nullable().optional().describe('Folder UUID or null to unfile'),
         tags: z.array(z.string()).optional().describe('REPLACES all existing tags'),
       },
     },
@@ -397,6 +400,74 @@ defineTool('mcp:write', (server, getUserId) => {
       try {
         const result = await deleteTask(id, getUserId());
         return toolResult(result);
+      } catch (error) {
+        return toolError(error);
+      }
+    }
+  );
+});
+
+// ─── Task Links ──────────────────────────────────────────────────
+
+defineTool('mcp:write', (server, getUserId) => {
+  server.registerTool(
+    'notez_add_task_link',
+    {
+      description: 'Add a URL link to a task. A task can have up to 10 links.',
+      inputSchema: {
+        taskId: z.string().uuid().describe('Task UUID'),
+        url: z.string().url().max(2048).describe('URL to attach (http or https)'),
+        title: z.string().max(255).optional().describe('Optional display title for the link'),
+      },
+    },
+    async ({ taskId, url, title }) => {
+      try {
+        const link = await addTaskLink(taskId, getUserId(), { url, title });
+        return toolResult(link);
+      } catch (error) {
+        return toolError(error);
+      }
+    }
+  );
+});
+
+defineTool('mcp:write', (server, getUserId) => {
+  server.registerTool(
+    'notez_update_task_link',
+    {
+      description: 'Update the URL or title of an existing task link.',
+      inputSchema: {
+        taskId: z.string().uuid().describe('Task UUID'),
+        linkId: z.string().uuid().describe('Link UUID'),
+        url: z.string().url().max(2048).optional().describe('New URL'),
+        title: z.string().max(255).nullable().optional().describe('New title, or null to clear'),
+      },
+    },
+    async ({ taskId, linkId, url, title }) => {
+      try {
+        const link = await updateTaskLink(taskId, linkId, getUserId(), { url, title });
+        return toolResult(link);
+      } catch (error) {
+        return toolError(error);
+      }
+    }
+  );
+});
+
+defineTool('mcp:write', (server, getUserId) => {
+  server.registerTool(
+    'notez_delete_task_link',
+    {
+      description: 'Remove a link from a task.',
+      inputSchema: {
+        taskId: z.string().uuid().describe('Task UUID'),
+        linkId: z.string().uuid().describe('Link UUID'),
+      },
+    },
+    async ({ taskId, linkId }) => {
+      try {
+        await deleteTaskLink(taskId, linkId, getUserId());
+        return toolResult({ message: 'Link deleted' });
       } catch (error) {
         return toolError(error);
       }
@@ -623,6 +694,276 @@ defineTool('mcp:write', (server, getUserId) => {
         const share = await updateSharePermission(noteId, getUserId(), shareId, permission);
         return toolResult(share);
       } catch (error) {
+        return toolError(error);
+      }
+    }
+  );
+});
+
+// ─── Notifications ──────────────────────────────────────────────────
+
+defineTool('mcp:read', (server, getUserId) => {
+  server.registerTool(
+    'notez_list_notifications',
+    {
+      description: 'List notifications for the current user, sorted newest first.',
+      inputSchema: {
+        limit: z.number().min(1).max(100).default(20).describe('Max notifications to return'),
+        offset: z.number().min(0).default(0).describe('Offset for pagination'),
+        unreadOnly: z.boolean().default(false).describe('Return only unread notifications'),
+      },
+    },
+    async ({ limit, offset, unreadOnly }) => {
+      try {
+        const result = await getNotifications(getUserId(), { limit, offset, unreadOnly });
+        return toolResult(result);
+      } catch (error) {
+        return toolError(error);
+      }
+    }
+  );
+});
+
+defineTool('mcp:read', (server, getUserId) => {
+  server.registerTool(
+    'notez_get_unread_count',
+    {
+      description: 'Get the number of unread notifications.',
+      inputSchema: {},
+    },
+    async () => {
+      try {
+        const count = await getUnreadCount(getUserId());
+        return toolResult({ count });
+      } catch (error) {
+        return toolError(error);
+      }
+    }
+  );
+});
+
+defineTool('mcp:write', (server, getUserId) => {
+  server.registerTool(
+    'notez_mark_notification_read',
+    {
+      description: 'Mark a single notification as read.',
+      inputSchema: {
+        id: z.string().uuid().describe('Notification UUID'),
+      },
+    },
+    async ({ id }) => {
+      try {
+        const notification = await markAsRead(id, getUserId());
+        return toolResult(notification);
+      } catch (error) {
+        return toolError(error);
+      }
+    }
+  );
+});
+
+defineTool('mcp:write', (server, getUserId) => {
+  server.registerTool(
+    'notez_mark_all_notifications_read',
+    {
+      description: 'Mark all notifications as read. Returns the count of notifications marked.',
+      inputSchema: {},
+    },
+    async () => {
+      try {
+        const result = await markAllAsRead(getUserId());
+        return toolResult(result);
+      } catch (error) {
+        return toolError(error);
+      }
+    }
+  );
+});
+
+defineTool('mcp:write', (server, getUserId) => {
+  server.registerTool(
+    'notez_delete_notification',
+    {
+      description: 'Delete a notification.',
+      inputSchema: {
+        id: z.string().uuid().describe('Notification UUID'),
+      },
+    },
+    async ({ id }) => {
+      try {
+        await deleteNotification(id, getUserId());
+        return toolResult({ message: 'Notification deleted' });
+      } catch (error) {
+        return toolError(error);
+      }
+    }
+  );
+});
+
+// ─── Feedback ──────────────────────────────────────────────────
+
+defineTool('mcp:write', (server, getUserId) => {
+  server.registerTool(
+    'notez_create_feedback',
+    {
+      description: 'Submit a bug report or feature request. type must be BUG or FEATURE.',
+      inputSchema: {
+        type: z.enum(['BUG', 'FEATURE']).describe('Feedback type: BUG or FEATURE'),
+        title: z.string().min(1).max(100).describe('Short summary (max 100 characters)'),
+        description: z.string().min(1).describe('Detailed description of the bug or feature request'),
+        category: z.string().max(50).optional().describe('Optional category (e.g. "editor", "tasks", "sharing")'),
+        priority: z.string().max(50).optional().describe('Optional priority (e.g. "low", "medium", "high")'),
+      },
+    },
+    async ({ type, title, description, category, priority }) => {
+      try {
+        const feedback = await createFeedback(getUserId(), { type, title, description, category, priority });
+        return toolResult(feedback);
+      } catch (error) {
+        return toolError(error);
+      }
+    }
+  );
+});
+
+defineTool('mcp:read', (server, getUserId) => {
+  server.registerTool(
+    'notez_list_my_feedback',
+    {
+      description: "List the current user's own feedback submissions.",
+      inputSchema: {
+        limit: z.number().min(1).max(100).default(50).describe('Max results to return'),
+        offset: z.number().min(0).default(0).describe('Offset for pagination'),
+      },
+    },
+    async ({ limit, offset }) => {
+      try {
+        const result = await listUserFeedback(getUserId(), { limit, offset });
+        return toolResult(result);
+      } catch (error) {
+        return toolError(error);
+      }
+    }
+  );
+});
+
+defineTool('mcp:read', (server, getUserId) => {
+  server.registerTool(
+    'notez_get_feedback',
+    {
+      description: 'Get a single feedback submission by ID. Users can only view their own submissions.',
+      inputSchema: {
+        id: z.string().uuid().describe('Feedback submission UUID'),
+      },
+    },
+    async ({ id }) => {
+      try {
+        const feedback = await getFeedbackById(id, getUserId());
+        return toolResult(feedback);
+      } catch (error) {
+        return toolError(error);
+      }
+    }
+  );
+});
+
+// ─── AI ──────────────────────────────────────────────────
+
+defineTool('mcp:read', (server, getUserId) => {
+  server.registerTool(
+    'notez_check_ai_status',
+    {
+      description: 'Check whether the user has AI configured. Returns { configured, provider, model }. Call this before using AI tools to confirm AI is set up.',
+      inputSchema: {},
+    },
+    async () => {
+      try {
+        const config = await aiService.getUserConfiguration(getUserId());
+        if (!config) {
+          return toolResult({ configured: false, provider: null, model: null });
+        }
+        return toolResult({ configured: true, provider: config.provider, model: config.model || null });
+      } catch (error) {
+        return toolError(error);
+      }
+    }
+  );
+});
+
+defineTool('mcp:write', (server, getUserId) => {
+  server.registerTool(
+    'notez_ai_summarize',
+    {
+      description: 'Summarize note content using the user\'s configured AI provider. Returns { summary }. Requires AI to be configured — call notez_check_ai_status first if unsure.',
+      inputSchema: {
+        content: z.string().min(1).describe('Text content to summarize'),
+        maxLength: z.number().min(10).max(500).optional().describe('Target summary length in words (default: ~100)'),
+      },
+    },
+    async ({ content, maxLength }) => {
+      try {
+        const summary = await aiService.summarize(getUserId(), { content, maxLength });
+        return toolResult({ summary });
+      } catch (error) {
+        if (error instanceof AIProviderNotConfiguredError) {
+          return toolError(new Error('AI is not configured. Ask the user to set up their AI provider in Settings first.'));
+        }
+        return toolError(error);
+      }
+    }
+  );
+});
+
+defineTool('mcp:write', (server, getUserId) => {
+  server.registerTool(
+    'notez_ai_suggest_title',
+    {
+      description: 'Suggest a title for note content using AI. Returns { title }. Requires AI configured.',
+      inputSchema: {
+        content: z.string().min(1).describe('Note content to generate a title for'),
+        maxLength: z.number().min(10).max(200).optional().describe('Max title length in characters'),
+      },
+    },
+    async ({ content, maxLength }) => {
+      try {
+        const title = await aiService.suggestTitle(getUserId(), { content, maxLength });
+        return toolResult({ title });
+      } catch (error) {
+        if (error instanceof AIProviderNotConfiguredError) {
+          return toolError(new Error('AI is not configured. Ask the user to set up their AI provider in Settings first.'));
+        }
+        return toolError(error);
+      }
+    }
+  );
+});
+
+defineTool('mcp:write', (server, getUserId) => {
+  server.registerTool(
+    'notez_ai_suggest_tags',
+    {
+      description: "Suggest tags for note content using AI, informed by the user's existing tags. Returns { tags: string[] }. Requires AI configured.",
+      inputSchema: {
+        content: z.string().min(1).describe('Note content to suggest tags for'),
+        maxTags: z.number().min(1).max(10).optional().describe('Max number of tags to suggest (default: 5)'),
+      },
+    },
+    async ({ content, maxTags }) => {
+      try {
+        // Fetch user's existing tags for context (mirrors the REST route behaviour)
+        const existingTagRows = await prisma.tag.findMany({
+          where: { userId: getUserId() },
+          select: { name: true },
+          orderBy: { createdAt: 'desc' },
+          take: 50,
+        });
+        const existingTags = existingTagRows.map((t: { name: string }) => t.name);
+        const tags = await aiService.suggestTags(getUserId(), { content, maxTags, existingTags });
+        return toolResult({ tags });
+      } catch (error) {
+        if (error instanceof AIProviderNotConfiguredError) {
+          return toolError(new Error('AI is not configured. Ask the user to set up their AI provider in Settings first.'));
+        }
         return toolError(error);
       }
     }

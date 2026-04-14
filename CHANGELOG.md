@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.27.0] - 2026-04-14
+
+### Added
+
+- **MCP: Task Links** — New tools `notez_add_task_link`, `notez_update_task_link`, `notez_delete_task_link` for managing URL links on tasks via MCP. Each task supports up to 10 links.
+- **MCP: Notifications** — New tools `notez_list_notifications`, `notez_get_unread_count`, `notez_mark_notification_read`, `notez_mark_all_notifications_read`, `notez_delete_notification`. Read tools use `mcp:read` scope; mutation tools use `mcp:write`.
+- **MCP: Feedback** — New tools `notez_create_feedback`, `notez_list_my_feedback`, `notez_get_feedback` for submitting and reviewing bug reports and feature requests via MCP.
+- **MCP: AI** — New tools `notez_check_ai_status`, `notez_ai_summarize`, `notez_ai_suggest_title`, `notez_ai_suggest_tags`. AI tools use the user's configured provider; `notez_ai_suggest_tags` fetches the user's existing tags for context (mirrors the REST route behaviour). Status check uses `mcp:read`; inference tools use `mcp:write`.
+
+### Fixed
+
+- **MCP: Task dueDate** — `notez_update_task` description now explicitly states that `dueDate` must be an ISO 8601 string (e.g. `2026-04-20T00:00:00Z`) and that `priority` must be one of `LOW`, `MEDIUM`, `HIGH`, `URGENT`. Previously, ambiguous descriptions caused Claude to pass natural-language values that failed Zod validation silently.
+- **MCP: Task completedAt** — `notez_get_task` and `notez_list_tasks` descriptions now document the `completedAt` field (set automatically when status changes to `COMPLETED`, cleared otherwise).
+
 ## [1.26.0] - 2026-04-13
 
 ### Changed
