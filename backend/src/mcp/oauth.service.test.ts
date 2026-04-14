@@ -105,7 +105,7 @@ describe('oauth.service', () => {
   // ─── registerClient ─────────────────────────────────────────────────
 
   describe('registerClient', () => {
-    it('creates a client with pending_approval status', async () => {
+    it('auto-approves clients with valid redirect URIs (security via redirect URI allowlist, not admin gate)', async () => {
       mockPrisma.oAuthClient.create.mockResolvedValue({
         id: 'uuid-1',
         clientId: 'notez_abc',
@@ -118,7 +118,7 @@ describe('oauth.service', () => {
         responseTypes: ['code'],
         scope: 'mcp:read',
         tokenEndpointAuthMethod: 'client_secret_post',
-        status: 'pending_approval',
+        status: 'approved',
         approvedByUserId: null,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -133,11 +133,11 @@ describe('oauth.service', () => {
       expect(result.clientSecret).toBeDefined();
       expect(result.redirectUris).toEqual(['https://claude.ai/callback']);
 
-      // Verify client was created with pending status
+      // Verify client was created with approved status (no admin gate)
       expect(mockPrisma.oAuthClient.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            status: 'pending_approval',
+            status: 'approved',
           }),
         })
       );

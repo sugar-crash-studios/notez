@@ -12,6 +12,13 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: '1.26.0',
+    date: '2026-04-13',
+    fixed: [
+      'Connecting to Claude is now seamless and no longer requires admin approval each time',
+    ],
+  },
+  {
     version: '1.25.0',
     date: '2026-04-13',
     fixed: [

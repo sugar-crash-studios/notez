@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.26.0] - 2026-04-13
+
+### Changed
+
+- **MCP Connector Auto-Approval**: New MCP client registrations are now auto-approved when the redirect URI matches the trusted domain allowlist (claude.ai, anthropic.com). Previously, an admin had to manually approve each registration. This was incompatible with claude.ai's connector flow which performs DCR + authorize as a single atomic operation, leaving no time for admin approval. Security model is unchanged: the strict redirect URI allowlist is the trust boundary, and per-user consent is still required.
+- **Pending Client Cap**: Replaced "20 pending clients" cap with "100 total clients" cap. Cleanup now removes rejected and stale clients.
+- **Notification Wording**: Updated to reflect auto-approval ("registered as a connector" vs "is requesting access").
+
 ## [1.25.0] - 2026-04-13
 
 ### Fixed

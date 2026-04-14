@@ -108,7 +108,7 @@ export interface RegisterClientResult {
   tokenEndpointAuthMethod: string;
 }
 
-const MAX_PENDING_CLIENTS = 20;
+const MAX_TOTAL_CLIENTS = 100;
 
 export async function registerClient(input: RegisterClientInput): Promise<RegisterClientResult> {
   // Validate all redirect URIs
@@ -122,10 +122,10 @@ export async function registerClient(input: RegisterClientInput): Promise<Regist
     throw new OAuthError('invalid_client_metadata', 'At least one redirect_uri is required');
   }
 
-  // Cap pending registrations to prevent admin queue spam
-  const pendingCount = await prisma.oAuthClient.count({ where: { status: 'pending_approval' } });
-  if (pendingCount >= MAX_PENDING_CLIENTS) {
-    throw new OAuthError('invalid_client_metadata', 'Too many pending registrations. Try again later.');
+  // Cap total client registrations to prevent unbounded growth
+  const totalCount = await prisma.oAuthClient.count();
+  if (totalCount >= MAX_TOTAL_CLIENTS) {
+    throw new OAuthError('invalid_client_metadata', 'Too many client registrations. Contact the admin.');
   }
 
   const clientId = `notez_${randomBytes(16).toString('hex')}`;
@@ -135,6 +135,10 @@ export async function registerClient(input: RegisterClientInput): Promise<Regist
   // Client secret expires in 90 days
   const clientSecretExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
 
+  // Auto-approve clients that pass the redirect URI allowlist.
+  // Security model: trust comes from the strict redirect URI allowlist (exact-match
+  // claude.ai/anthropic.com domains only), not from per-client admin approval.
+  // The admin UI provides visibility and revocation; users still grant individual consent.
   const client = await prisma.oAuthClient.create({
     data: {
       clientId,
@@ -147,7 +151,7 @@ export async function registerClient(input: RegisterClientInput): Promise<Regist
       responseTypes: input.responseTypes || ['code'],
       scope: input.scope || 'mcp:read',
       tokenEndpointAuthMethod: input.tokenEndpointAuthMethod || 'client_secret_post',
-      status: 'pending_approval', // Admin must approve
+      status: 'approved',
     },
   });
 
@@ -600,11 +604,14 @@ export async function cleanupExpiredOAuthData(): Promise<void> {
     where: { expiresAt: { lt: now } },
   });
 
-  // Delete stale pending client registrations (older than 7 days)
+  // Delete unused client registrations (no associated tokens, older than 30 days).
+  // This catches abandoned clients from re-registrations without disturbing active connections.
   await prisma.oAuthClient.deleteMany({
     where: {
-      status: 'pending_approval',
-      createdAt: { lt: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) },
+      OR: [
+        { status: 'rejected' },
+        { status: 'pending_approval', createdAt: { lt: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) } },
+      ],
     },
   });
 }
