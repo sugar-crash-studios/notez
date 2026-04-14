@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 // Mock all service dependencies
@@ -40,6 +41,7 @@ vi.mock('../services/tag.service.js', () => ({
   listTags: vi.fn(),
   renameTag: vi.fn(),
   deleteTag: vi.fn(),
+  getUserTagNames: vi.fn().mockResolvedValue([]),
 }));
 vi.mock('../services/share.service.js', () => ({
   shareNote: vi.fn(),
@@ -55,7 +57,7 @@ vi.mock('../services/notification.service.js', () => ({
   deleteNotification: vi.fn(),
 }));
 vi.mock('../services/feedback.service.js', () => ({
-  createFeedback: vi.fn(),
+  createFeedbackWithRateLimit: vi.fn(),
   getFeedbackById: vi.fn(),
   listUserFeedback: vi.fn(),
 }));
@@ -71,7 +73,7 @@ vi.mock('../services/ai/index.js', () => ({
   },
 }));
 
-import { registerNotezTools } from './tools.js';
+import { registerNotezTools, __resetAiRateLimiterForTesting__, __resetToolDefsForTesting__ } from './tools.js';
 
 describe('tools', () => {
   let server: McpServer;
@@ -79,6 +81,8 @@ describe('tools', () => {
 
   beforeEach(() => {
     registeredTools.length = 0;
+    __resetAiRateLimiterForTesting__();
+    __resetToolDefsForTesting__();
     server = {
       registerTool: vi.fn((name: string) => {
         registeredTools.push(name);
@@ -157,12 +161,44 @@ describe('tools', () => {
     });
   });
 
+  describe('task link scope enforcement', () => {
+    it('does not register task link tools when only mcp:read is granted', () => {
+      registerNotezTools(server, () => 'user-1', ['mcp:read']);
+      expect(registeredTools).not.toContain('notez_add_task_link');
+      expect(registeredTools).not.toContain('notez_update_task_link');
+      expect(registeredTools).not.toContain('notez_delete_task_link');
+    });
+
+    it('registers task link tools when mcp:write is granted', () => {
+      registerNotezTools(server, () => 'user-1', ['mcp:write']);
+      expect(registeredTools).toContain('notez_add_task_link');
+      expect(registeredTools).toContain('notez_update_task_link');
+      expect(registeredTools).toContain('notez_delete_task_link');
+    });
+  });
+
+  describe('AI tool scope enforcement', () => {
+    it('registers notez_check_ai_status in read scope, AI inference tools in write scope only', () => {
+      registerNotezTools(server, () => 'user-1', ['mcp:read']);
+      expect(registeredTools).toContain('notez_check_ai_status');
+      expect(registeredTools).not.toContain('notez_ai_summarize');
+      expect(registeredTools).not.toContain('notez_ai_suggest_title');
+      expect(registeredTools).not.toContain('notez_ai_suggest_tags');
+
+      registeredTools.length = 0;
+      registerNotezTools(server, () => 'user-1', ['mcp:write']);
+      expect(registeredTools).not.toContain('notez_check_ai_status');
+      expect(registeredTools).toContain('notez_ai_summarize');
+      expect(registeredTools).toContain('notez_ai_suggest_title');
+      expect(registeredTools).toContain('notez_ai_suggest_tags');
+    });
+  });
+
   describe('notez_update_task dueDate validation', () => {
     it('dueDate input schema rejects non-ISO strings', () => {
       // Regression test for Pam's issue: Claude passing natural-language dates.
       // The MCP framework validates inputSchema before calling the handler, so
       // testing the schema directly is the correct approach.
-      const { z } = require('zod');
       const dueDateSchema = z.string().datetime().nullable().optional();
 
       // Valid ISO 8601 strings should pass
