@@ -155,13 +155,14 @@ export async function oauthRoutes(fastify: FastifyInstance) {
       tokenEndpointAuthMethod: body.token_endpoint_auth_method,
     });
 
-    // Notify admins about the pending client registration
+    // Notify admins about the new MCP client registration (auto-approved per redirect URI allowlist).
+    // Admins can review and revoke from Settings > MCP Connectors.
     notifyAdmins(
       'MCP_CLIENT_PENDING',
       `New MCP connector: ${result.clientName || 'Unknown app'}`,
       'mcp_client',
       result.clientId,
-      `${result.clientName || 'An application'} is requesting access. Approve or reject in Settings > MCP Connectors.`
+      `${result.clientName || 'An application'} registered as a connector. Review in Settings > MCP Connectors.`
     ).catch((err) => fastify.log.error(err, 'Failed to notify admins about new MCP client'));
 
     reply.code(201);

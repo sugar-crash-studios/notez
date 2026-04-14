@@ -311,11 +311,10 @@ export function McpConnectorSettings() {
       <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
         <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">How MCP Connectors work</h3>
         <ol className="text-xs text-gray-500 dark:text-gray-400 space-y-1 list-decimal list-inside">
-          <li>An app (like Claude) registers as a connector via your Notez URL</li>
-          <li>The registration appears here as "Pending Approval"</li>
-          <li>You approve the connector to allow it to request user authorization</li>
-          <li>Each user then individually authorizes the app via a consent screen</li>
-          <li>Revoking a connector disconnects all users from that app</li>
+          <li>Apps (like Claude) register as connectors via your Notez URL</li>
+          <li>Registration is auto-approved if the callback is on the trusted domain list (claude.ai, anthropic.com)</li>
+          <li>Each user individually authorizes the app via a consent screen</li>
+          <li>Revoking a connector here disconnects all users and active sessions</li>
         </ol>
       </div>
     </div>
