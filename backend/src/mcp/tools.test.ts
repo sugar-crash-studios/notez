@@ -71,9 +71,37 @@ vi.mock('../services/ai/index.js', () => ({
   AIProviderNotConfiguredError: class AIProviderNotConfiguredError extends Error {
     constructor() { super('AI not configured'); }
   },
+  AIProviderConnectionError: class AIProviderConnectionError extends Error {
+    constructor() { super('Connection failed'); }
+  },
+  AIProviderRateLimitError: class AIProviderRateLimitError extends Error {
+    constructor() { super('Rate limited'); }
+  },
+  AIModelNotFoundError: class AIModelNotFoundError extends Error {
+    constructor() { super('Model not found'); }
+  },
+  AIServiceError: class AIServiceError extends Error {
+    constructor() { super('AI service error'); }
+  },
 }));
 
 import { registerNotezTools, __resetAiRateLimiterForTesting__, __resetToolDefsForTesting__ } from './tools.js';
+import { getNoteById } from '../services/note.service.js';
+import { aiService, AIProviderNotConfiguredError, AIProviderRateLimitError, AIModelNotFoundError, AIProviderConnectionError, AIServiceError } from '../services/ai/index.js';
+import { prisma } from '../lib/db.js';
+
+// Helper: builds a server mock that captures both tool names and handlers.
+function makeCapturingServer() {
+  const names: string[] = [];
+  const handlers: Record<string, (args: unknown) => Promise<unknown>> = {};
+  const mock = {
+    registerTool: vi.fn((name: string, _def: unknown, handler: (args: unknown) => Promise<unknown>) => {
+      names.push(name);
+      handlers[name] = handler;
+    }),
+  } as unknown as McpServer;
+  return { mock, names, handlers };
+}
 
 describe('tools', () => {
   let server: McpServer;
@@ -97,6 +125,7 @@ describe('tools', () => {
       // Should include read tools
       expect(registeredTools).toContain('notez_search_notes');
       expect(registeredTools).toContain('notez_get_note');
+      expect(registeredTools).toContain('notez_get_note_by_title');
       expect(registeredTools).toContain('notez_list_notes');
       expect(registeredTools).toContain('notez_list_tasks');
       expect(registeredTools).toContain('notez_list_folders');
@@ -228,6 +257,119 @@ describe('tools', () => {
       expect(capturedDescription).toContain('ISO 8601');
       expect(capturedDescription).toContain('LOW');
       expect(capturedDescription).toContain('URGENT');
+    });
+  });
+
+  describe('notez_append_to_note handler', () => {
+    it('returns error when note content would exceed maximum size', async () => {
+      const { mock, handlers } = makeCapturingServer();
+      registerNotezTools(mock, () => 'user-1', ['mcp:write']);
+
+      vi.mocked(getNoteById).mockResolvedValue({ id: 'note-1', content: 'x' } as any);
+      // Simulate the DB size guard rejecting the append (returns 0 rows updated)
+      vi.mocked(prisma.$executeRaw).mockResolvedValue(0);
+
+      const result = await handlers['notez_append_to_note']({ id: 'note-1', content: '<p>extra</p>' }) as any;
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('exceed maximum size');
+    });
+  });
+
+  describe('AI rate limiting', () => {
+    it('returns rate-limit error after 20 AI calls within the window', async () => {
+      const { mock, handlers } = makeCapturingServer();
+      registerNotezTools(mock, () => 'user-1', ['mcp:write']);
+
+      vi.mocked(aiService.summarize).mockResolvedValue('summary' as any);
+
+      // Exhaust the 20-call budget
+      for (let i = 0; i < 20; i++) {
+        await handlers['notez_ai_summarize']({ content: 'test content' });
+      }
+
+      // 21st call must be refused
+      const result = await handlers['notez_ai_summarize']({ content: 'test content' }) as any;
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('rate limit');
+    });
+
+    it('rate limit is per-user: different users have independent budgets', async () => {
+      // Register two separate sessions for two different users
+      const { mock: mock1, handlers: h1 } = makeCapturingServer();
+      registerNotezTools(mock1, () => 'user-A', ['mcp:write']);
+
+      __resetToolDefsForTesting__();
+      const { mock: mock2, handlers: h2 } = makeCapturingServer();
+      registerNotezTools(mock2, () => 'user-B', ['mcp:write']);
+
+      vi.mocked(aiService.summarize).mockResolvedValue('summary' as any);
+
+      // Exhaust user-A's budget
+      for (let i = 0; i < 20; i++) {
+        await h1['notez_ai_summarize']({ content: 'x' });
+      }
+
+      // user-B should still succeed
+      const result = await h2['notez_ai_summarize']({ content: 'x' }) as any;
+      expect(result.isError).toBeFalsy();
+    });
+  });
+
+  describe('handleAiError — AI provider error routing', () => {
+    let handlers: Record<string, (args: unknown) => Promise<unknown>>;
+
+    beforeEach(() => {
+      __resetAiRateLimiterForTesting__();
+      __resetToolDefsForTesting__();
+      const { mock, handlers: h } = makeCapturingServer();
+      registerNotezTools(mock, () => 'user-1', ['mcp:write', 'mcp:read']);
+      handlers = h;
+    });
+
+    it('returns actionable message for AIProviderNotConfiguredError', async () => {
+      vi.mocked(aiService.summarize).mockRejectedValue(new AIProviderNotConfiguredError());
+      const result = await handlers['notez_ai_summarize']({ content: 'x' }) as any;
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('not configured');
+      expect(result.content[0].text).toContain('Settings');
+    });
+
+    it('returns actionable message for AIProviderRateLimitError', async () => {
+      vi.mocked(aiService.summarize).mockRejectedValue(new AIProviderRateLimitError());
+      const result = await handlers['notez_ai_summarize']({ content: 'x' }) as any;
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('rate limit');
+    });
+
+    it('returns actionable message for AIModelNotFoundError', async () => {
+      vi.mocked(aiService.suggestTitle).mockRejectedValue(new AIModelNotFoundError());
+      const result = await handlers['notez_ai_suggest_title']({ content: 'x' }) as any;
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('model');
+    });
+
+    it('returns actionable message for AIProviderConnectionError', async () => {
+      vi.mocked(aiService.suggestTags).mockRejectedValue(new AIProviderConnectionError());
+      const result = await handlers['notez_ai_suggest_tags']({ content: 'x' }) as any;
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('provider');
+    });
+
+    it('returns generic message for unknown errors (no internal detail leak)', async () => {
+      vi.mocked(aiService.summarize).mockRejectedValue(new Error('db_internal_secret_path'));
+      const result = await handlers['notez_ai_summarize']({ content: 'x' }) as any;
+      expect(result.isError).toBe(true);
+      // Must NOT expose the raw internal error message
+      expect(result.content[0].text).not.toContain('db_internal_secret_path');
+      expect(result.content[0].text).toContain('unexpected error');
+    });
+
+    it('passes through timeout error message', async () => {
+      vi.mocked(aiService.summarize).mockRejectedValue(new Error('AI request timed out after 30 seconds'));
+      const result = await handlers['notez_ai_summarize']({ content: 'x' }) as any;
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('timed out');
     });
   });
 });
