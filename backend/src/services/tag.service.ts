@@ -156,6 +156,19 @@ export async function getTagStats(userId: string) {
 }
 
 /**
+ * Get tag names for a user — lightweight query for AI context (no counts, sorted recent-first)
+ */
+export async function getUserTagNames(userId: string, limit: number = 50): Promise<string[]> {
+  const tags = await prisma.tag.findMany({
+    where: { userId },
+    select: { name: true },
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+  });
+  return tags.map((t: { name: string }) => t.name);
+}
+
+/**
  * Search/autocomplete tags by name
  */
 export async function searchTags(userId: string, query: string, limit: number = 10) {
