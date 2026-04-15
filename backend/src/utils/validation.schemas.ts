@@ -199,7 +199,7 @@ export const aiSuggestTagsSchema = z.object({
 });
 
 // Safe URL schema - only allows http(s) protocols
-const safeUrlSchema = z.string()
+export const safeUrlSchema = z.string()
   .url('Invalid URL')
   .max(2048, 'URL must not exceed 2048 characters')
   .refine(

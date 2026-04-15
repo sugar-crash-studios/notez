@@ -5,6 +5,50 @@ import * as notificationService from './notification.service.js';
 import { safeFireAndForget } from '../utils/safe-notify.js';
 
 /**
+ * Create a feedback submission with atomic rate-limit check inside a transaction.
+ * Uses a serialized count + create to prevent concurrent submissions bypassing the limit.
+ * Notifies admins fire-and-forget after the transaction completes (mirrors createFeedback).
+ */
+export async function createFeedbackWithRateLimit(userId: string, input: CreateFeedbackInput, maxPerHour: number = 10) {
+  const feedback = await prisma.$transaction(async (tx) => {
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const recentCount = await tx.feedbackSubmission.count({
+      where: { userId, createdAt: { gte: oneHourAgo } },
+    });
+    if (recentCount >= maxPerHour) {
+      throw new Error('Rate limit reached: maximum 10 feedback submissions per hour.');
+    }
+    return tx.feedbackSubmission.create({
+      data: {
+        type: input.type as FeedbackType,
+        title: input.title,
+        description: input.description,
+        category: input.category || null,
+        priority: input.priority || null,
+        userId,
+      },
+      include: {
+        user: { select: { id: true, username: true } },
+      },
+    });
+  });
+
+  const typeLabel = input.type === 'BUG' ? 'bug report' : 'feature request';
+  safeFireAndForget(
+    notificationService.notifyAdmins(
+      'NEW_FEEDBACK',
+      `New ${typeLabel}: ${input.title}`,
+      'feedback',
+      feedback.id,
+      `${feedback.user.username} submitted a ${typeLabel}`
+    ),
+    'NOTIFY_ADMINS_FAILED',
+  );
+
+  return feedback;
+}
+
+/**
  * Create a new feedback submission
  */
 export async function createFeedback(userId: string, input: CreateFeedbackInput) {
