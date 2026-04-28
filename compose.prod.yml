@@ -74,6 +74,13 @@ services:
       MCP_REMOTE_ENABLED: ${MCP_REMOTE_ENABLED:-false}
       # Comma-separated list of allowed origins for MCP transport CORS
       MCP_ALLOWED_ORIGINS: ${MCP_ALLOWED_ORIGINS:-https://claude.ai,https://www.claude.ai}
+      # OpenTelemetry — ships traces/metrics/logs to the homelab OTel Collector.
+      # Set OTEL_SDK_DISABLED=true to opt out at runtime.
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-notez-backend}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
+      OTEL_EXPORTER_OTLP_PROTOCOL: ${OTEL_EXPORTER_OTLP_PROTOCOL:-http/protobuf}
+      OTEL_RESOURCE_ATTRIBUTES: ${OTEL_RESOURCE_ATTRIBUTES:-deployment.environment=prod,service.namespace=cogg}
+      OTEL_SDK_DISABLED: ${OTEL_SDK_DISABLED:-false}
     depends_on:
       notez-db:
         condition: service_healthy
@@ -81,10 +88,13 @@ services:
         condition: service_healthy
     networks:
       - notez-network
+      - apps-internal
 
 networks:
   notez-network:
     driver: bridge
+  apps-internal:
+    external: true
 
 volumes:
   notez_data:

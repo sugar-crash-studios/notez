@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **OpenTelemetry instrumentation** — backend now ships traces, metrics, and logs to the homelab OTel Collector (OpenObserve backend) when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. Uses `@opentelemetry/auto-instrumentations-node` for zero-code instrumentation of Fastify, HTTP, Postgres/Prisma, and outbound fetch. Set `OTEL_SDK_DISABLED=true` to opt out.
+
 ## [1.27.0] - 2026-04-14
 
 ### Added

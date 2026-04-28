@@ -1,3 +1,4 @@
+import './telemetry.js';
 import Fastify, { type FastifyError } from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
