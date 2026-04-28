@@ -15,7 +15,7 @@ if (enabled) {
       exporter: new OTLPMetricExporter(),
       exportIntervalMillis: 30_000,
     }),
-    logRecordProcessor: new BatchLogRecordProcessor(new OTLPLogExporter()),
+    logRecordProcessors: [new BatchLogRecordProcessor(new OTLPLogExporter())],
     instrumentations: [
       getNodeAutoInstrumentations({
         '@opentelemetry/instrumentation-fs': { enabled: false },
@@ -25,7 +25,13 @@ if (enabled) {
 
   sdk.start();
 
-  process.on('SIGTERM', () => {
-    sdk.shutdown().finally(() => process.exit(0));
+  // Flush pending telemetry on shutdown without taking ownership of the
+  // exit signal — Fastify/Prisma's own SIGTERM handler is responsible for
+  // closing the server. beforeExit fires after the event loop drains, so
+  // app handlers run first, then we get one chance to flush exporters.
+  process.once('beforeExit', () => {
+    sdk.shutdown().catch(() => {
+      // Best-effort flush; swallow errors so the process can still exit cleanly.
+    });
   });
 }
